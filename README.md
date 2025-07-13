@@ -2,6 +2,8 @@
 
 Modular pipeline for generating mock galaxy catalogs from AbacusSummit halo catalogs using the rgrspit_diffsky package. This code generates large-scale covariance mocks for the Roman Galactic Redshift Survey (GRS) Project Infrastructure Team (PIT) analysis.
 
+**📖 Full Documentation**: [https://grs-pit-covariance-mocks.readthedocs.io](https://grs-pit-covariance-mocks.readthedocs.io)
+
 ## Architecture
 
 The pipeline uses a **modular architecture** with core functionality organized in `src/covariance_mocks/`:
@@ -76,9 +78,20 @@ The pipeline generates two-panel scatter plots showing halo and galaxy distribut
 
 *Two-panel visualization: Left panel shows halos colored by mass with r100 virial radius scaling. Right panel shows galaxies colored by stellar mass. Both panels include zoom-in insets of a selected region.*
 
+## Documentation
+
+For comprehensive information, see the **[full documentation on Read the Docs](https://grs-pit-covariance-mocks.readthedocs.io)**, including:
+
+- **[Installation Guide](https://grs-pit-covariance-mocks.readthedocs.io/en/latest/installation.html)** - Environment setup and dependencies
+- **[User Guide](https://grs-pit-covariance-mocks.readthedocs.io/en/latest/user_guide.html)** - Detailed usage instructions and examples
+- **[API Reference](https://grs-pit-covariance-mocks.readthedocs.io/en/latest/api.html)** - Complete function and module documentation
+- **[Development Guide](https://grs-pit-covariance-mocks.readthedocs.io/en/latest/development.html)** - Contributing and development setup
+
 ## Environment
 
 The pipeline requires:
 - NERSC Perlmutter system with GPU nodes
 - Conda environment with JAX, rgrspit_diffsky, and scientific Python stack
 - MPI support with parallel HDF5
+
+See the [Installation Guide](https://grs-pit-covariance-mocks.readthedocs.io/en/latest/installation.html) for detailed setup instructions.
