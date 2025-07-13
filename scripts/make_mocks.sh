@@ -55,7 +55,11 @@ else
     OUTPUT_BASE="mock_AbacusSummit_small_c000_ph3000_z1.100"
 fi
 OUTPUT_CATALOG="${OUTPUT_BASE}.hdf5"
-OUTPUT_PLOT="${OUTPUT_BASE}.png"
+if [[ "$TEST_MODE" == true ]]; then
+    OUTPUT_PLOT="halo_galaxy_scatter_AbacusSummit_small_c000_ph3000_z1.100_test${N_GEN}.png"
+else
+    OUTPUT_PLOT="halo_galaxy_scatter_AbacusSummit_small_c000_ph3000_z1.100.png"
+fi
 
 # Load environment
 source $SCRIPT_DIR/load_env.sh
@@ -68,10 +72,10 @@ else
     # Run galaxy generation with optional test mode
     if [[ "$TEST_MODE" == true ]]; then
         # Test mode: single GPU for quick testing
-        exe="srun -n 1 -c 8 --qos=interactive -N 1 --time=15 -C gpu -A ${NERSC_ACCOUNT} --gpus-per-node=1 python $SCRIPT_DIR/make_sfh_cov_mocks.py nersc $OUTPUT_DIR --test $N_GEN"
+        exe="srun -n 1 -c 8 --qos=interactive -N 1 --time=15 -C gpu -A ${NERSC_ACCOUNT} --gpus-per-node=1 python $SCRIPT_DIR/generate_single_mock.py nersc $OUTPUT_DIR --test $N_GEN"
     else
         # Production mode: multiple GPUs with MPI
-        exe="stdbuf -o0 -e0 srun -n 6 --gpus-per-node=3 -c 32 --qos=interactive -N 2 --time=${TIME_LIMIT} -C gpu -A ${NERSC_ACCOUNT} python $SCRIPT_DIR/make_sfh_cov_mocks.py nersc $OUTPUT_DIR"
+        exe="stdbuf -o0 -e0 srun -n 6 --gpus-per-node=3 -c 32 --qos=interactive -N 2 --time=${TIME_LIMIT} -C gpu -A ${NERSC_ACCOUNT} python $SCRIPT_DIR/generate_single_mock.py nersc $OUTPUT_DIR"
     fi
     printf "Running galaxy catalog generation with command:\n  %s\n" "$exe"
     $exe   

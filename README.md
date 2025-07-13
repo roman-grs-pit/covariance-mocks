@@ -1,6 +1,16 @@
 # Roman GRS PIT Covariance Mocks
 
-Pipeline for generating mock galaxy catalogs from AbacusSummit halo catalogs using the rgrspit_diffsky package. This code generates large-scale covariance mocks for the Roman Galactic Redshift Survey (GRS) Project Infrastructure Team (PIT) analysis.
+Modular pipeline for generating mock galaxy catalogs from AbacusSummit halo catalogs using the rgrspit_diffsky package. This code generates large-scale covariance mocks for the Roman Galactic Redshift Survey (GRS) Project Infrastructure Team (PIT) analysis.
+
+## Architecture
+
+The pipeline uses a **modular architecture** with core functionality organized in `src/covariance_mocks/`:
+
+- **`data_loader.py`** - Halo catalog loading and filtering
+- **`galaxy_generator.py`** - Galaxy population modeling via rgrspit_diffsky
+- **`hdf5_writer.py`** - Parallel HDF5 output with MPI collective I/O
+- **`mpi_setup.py`** - MPI initialization and domain decomposition
+- **`utils.py`** - Shared utilities and configuration
 
 ## Quick Start at NERSC
 
@@ -25,7 +35,7 @@ source scripts/load_env.sh
 source scripts/load_env.sh
 
 # 2. Generate mock catalog
-srun -n 6 --gpus-per-node=3 -c 32 --qos=interactive -N 2 --time=15 -C gpu -A m4943 python scripts/make_sfh_cov_mocks.py nersc /path/to/output/directory
+srun -n 6 --gpus-per-node=3 -c 32 --qos=interactive -N 2 --time=15 -C gpu -A m4943 python scripts/generate_single_mock.py nersc /path/to/output/directory
 
 # 3. Create visualization
 python scripts/plot_mock_catalog.py /path/to/output/mock_catalog.hdf5

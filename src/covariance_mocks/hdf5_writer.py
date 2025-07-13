@@ -1,197 +1,49 @@
-"""Generate covariance mocks for AbacusSummit halo catalogs"""
+"""
+HDF5 Writer Module
 
-import sys
-import argparse
+Handles parallel and single-process HDF5 file writing for galaxy catalogs.
+This module contains the complex collective I/O operations that will be reused
+across 40,000+ mock generation runs.
+
+Parallel HDF5 writing with MPI collective I/O operations.
+"""
+
 import os
 import numpy as np
-
-# MPI setup
-try:
-    from mpi4py import MPI
-    MPI_AVAILABLE = True
-except ImportError:
-    MPI_AVAILABLE = False
-
-# JAX-dependent imports done after MPI setup
-
-# AbacusSummit data configuration
-ABACUS_BASE_PATH = "/global/cfs/cdirs/desi/public/cosmosim/AbacusSummit"
-SIMULATION_SUITE = "small"
-SIMULATION_BOX = "AbacusSummit_small_c000"
-
-# Configuration for current run
-CURRENT_PHASE = "ph3000"
-CURRENT_REDSHIFT = "z1.100"
-CURRENT_Z_OBS = 1.1
-LGMP_MIN = 10.0  # log10 minimum halo mass
-
-def build_abacus_path(base_path, suite, box, phase, redshift):
-    """Build full path to AbacusSummit halo catalog directory"""
-    return os.path.join(base_path, suite, f"{box}_{phase}", "halos", redshift)
-
-
-def generate_mock_for_catalog(catalog_path, output_path, n_gen=None):
-    """Generate mock galaxy catalog for a single AbacusSummit halo catalog using MPI if available"""
-    
-    # Initialize MPI if available
-    if MPI_AVAILABLE:
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-        size = comm.Get_size()
-        
-        if rank == 0:
-            print(f"Starting MPI job with {size} processes")
-
-    else:
-        rank = 0
-        size = 1
-        comm = None
-        print("Running in single-process mode")
-
-    if MPI_AVAILABLE and size > 1:
-        import os
-        # Configure JAX for distributed use
-        os.environ['JAX_PLATFORMS'] = ''
-        os.environ['JAX_DISTRIBUTED_INITIALIZE'] = 'false'
-    
-    # Import JAX after MPI setup
-    import jax
-    from jax import random as jran
-    
-    if MPI_AVAILABLE and size > 1:
-        jax.distributed.initialize()
-    
-    # Report JAX configuration
-    print(f"Rank {rank}: JAX backend: {jax.default_backend()}")
-    print(f"Rank {rank}: JAX devices: {jax.devices()}")
-
-    # Import JAX-dependent packages
-    from dsps.cosmology import DEFAULT_COSMOLOGY
-    from rgrspit_diffsky import mc_galpop
-    from rgrspit_diffsky.data_loaders import load_abacus
-
-    # Generate random key
-    ran_key = jran.key(0)
-    
-    # Load halo catalog (all ranks load the same data initially)
-    halo_catalog = load_abacus.load_abacus_halo_catalog(catalog_path)
-
-    # Extract required variables from catalog
-    mass = halo_catalog['mass']
-    
-    # Filter out zero masses and apply minimum mass cut
-    min_mass = 10**LGMP_MIN
-    valid_mask = (mass > 0) & (mass >= min_mass)
-    
-    if np.sum(valid_mask) == 0:
-        raise ValueError(f"No halos above minimum mass {min_mass:.2e}")
-    
-    logmhost = np.log10(mass[valid_mask])
-    halo_radius = halo_catalog['radius'][valid_mask]
-    halo_pos = halo_catalog['pos'][valid_mask]
-    halo_vel = halo_catalog['vel'][valid_mask]
-    Lbox = halo_catalog['lbox']
-    
-    # Convert halo positions from [-Lbox/2, Lbox/2] to [0, Lbox]
-    halo_pos = halo_pos + Lbox/2
-    
-    if rank == 0:
-        print(f"Loaded {len(logmhost)} halos above mass threshold from {len(mass)} total halos")
-    
-    # Apply test mode limitation BEFORE slab decomposition (original logic)
-    # Select the n_gen halos with smallest x-coordinates from the full catalog
-    if n_gen is not None:
-        if rank == 0:
-            print(f"Test mode: selecting {n_gen} halos with smallest x-coordinates")
-        
-        # Sort by x-coordinate and take the first n_gen halos
-        x_coords = halo_pos[:, 0]
-        sorted_indices = np.argsort(x_coords)
-        test_indices = sorted_indices[:n_gen]
-        
-        # Apply test mode limitation to all arrays
-        logmhost = logmhost[test_indices]
-        halo_radius = halo_radius[test_indices]
-        halo_pos = halo_pos[test_indices]
-        halo_vel = halo_vel[test_indices]
-        
-        if rank == 0:
-            print(f"Test mode: reduced to {len(logmhost)} halos, x-range [{halo_pos[:, 0].min():.1f}, {halo_pos[:, 0].max():.1f}]")
-    
-    # Implement slab decomposition based on x-coordinate
-    # Each MPI rank gets a slab: [rank * Lbox/size, (rank+1) * Lbox/size)
-    y_min = rank * Lbox / size
-    y_max = (rank + 1) * Lbox / size
-    
-    # Select halos in this rank's slab
-    slab_mask = (halo_pos[:, 1] >= y_min) & (halo_pos[:, 1] < y_max)
-    
-    # Handle the last rank to include the boundary
-    if rank == size - 1:
-        slab_mask = (halo_pos[:, 1] >= y_min) & (halo_pos[:, 1] <= y_max)
-
-    # Extract halos for this rank
-    rank_logmhost = logmhost[slab_mask]
-    rank_halo_radius = halo_radius[slab_mask]
-    rank_halo_pos = halo_pos[slab_mask]
-    rank_halo_vel = halo_vel[slab_mask]
-
-    print(f"Rank {rank}: processing {len(rank_logmhost)} halos in y-slab [{y_min:.1f}, {y_max:.1f}]")
-
-    # Use rank-specific halos for galaxy generation
-    plot_logmhost = rank_logmhost
-    plot_halo_radius = rank_halo_radius
-    plot_halo_pos = rank_halo_pos
-    plot_halo_vel = rank_halo_vel
-    
-    print(f"Rank {rank}: using {len(plot_logmhost)} halos for galaxy generation")
-    
-    # Convert to JAX arrays with proper dtypes
-    import jax.numpy as jnp
-    plot_logmhost = jnp.asarray(plot_logmhost, dtype=jnp.float32)
-    plot_halo_radius = jnp.asarray(plot_halo_radius, dtype=jnp.float32)
-    plot_halo_pos = jnp.asarray(plot_halo_pos, dtype=jnp.float32)
-    plot_halo_vel = jnp.asarray(plot_halo_vel, dtype=jnp.float32)
-    Lbox = float(Lbox)
-    
-    # Generate mock galaxy catalog for selected halos
-    galcat = mc_galpop.mc_galpop_synthetic_subs(
-        ran_key,
-        plot_logmhost,
-        plot_halo_radius,
-        plot_halo_pos,
-        plot_halo_vel,
-        CURRENT_Z_OBS,
-        LGMP_MIN,
-        DEFAULT_COSMOLOGY,
-        Lbox,
-    )
-    
-    print(f"Rank {rank}: generated mock with {len(galcat['pos'])} galaxies from {len(plot_logmhost)} halos")
-    # Use parallel HDF5 writing instead of concatenation approach
-    if MPI_AVAILABLE and comm is not None and size > 1:
-        # Parallel HDF5 writing for multiple ranks
-        write_parallel_hdf5(galcat, plot_logmhost, plot_halo_radius, plot_halo_pos, plot_halo_vel, 
-                           output_path, rank, size, comm, Lbox)  
-    else:
-        # Single process - write directly to output file
-        write_single_hdf5(galcat, plot_logmhost, plot_halo_radius, plot_halo_pos, plot_halo_vel, 
-                         output_path, Lbox)
-    
-    print(f"Galaxy catalog saved to: {output_path}")
-    
-    # Explicit MPI cleanup to ensure clean exit
-    if MPI_AVAILABLE and comm is not None and size > 1:
-        print(f"Rank {rank}: Starting MPI finalization")
-        comm.Barrier()  # Ensure all ranks finish
-        print(f"Rank {rank}: MPI finalization complete")
-    
-    return galcat
+import h5py
 
 
 def write_single_hdf5(galcat, plot_logmhost, plot_halo_radius, plot_halo_pos, plot_halo_vel, output_path, Lbox):
-    import h5py
-    """Write galaxy catalog to HDF5 file for single process."""
+    """
+    Write galaxy catalog to HDF5 file for single process.
+    
+    Parameters
+    ----------
+    galcat : dict
+        Galaxy catalog from rgrspit_diffsky containing galaxy properties
+    plot_logmhost : array_like
+        Log10 halo masses used for galaxy generation  
+    plot_halo_radius : array_like
+        Halo virial radii in Mpc/h
+    plot_halo_pos : array_like, shape (N_halos, 3)
+        Halo positions in Mpc/h
+    plot_halo_vel : array_like, shape (N_halos, 3)
+        Halo velocities in km/s
+    output_path : str
+        Full path for output HDF5 file
+    Lbox : float
+        Simulation box size in Mpc/h
+        
+    Notes
+    -----
+    - Creates directory structure if it doesn't exist
+    - Saves galaxy properties under 'galaxies/' group
+    - Saves halo properties under 'halos/' group  
+    - Includes metadata attributes: Lbox, z_obs, lgmp_min, n_halos, n_galaxies
+    - Handles structured data by saving components separately
+    """
+    from . import CURRENT_Z_OBS, LGMP_MIN, SIMULATION_BOX, CURRENT_PHASE, CURRENT_REDSHIFT
+    
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
     with h5py.File(output_path, 'w') as f:
@@ -231,10 +83,46 @@ def write_single_hdf5(galcat, plot_logmhost, plot_halo_radius, plot_halo_pos, pl
 
 def write_parallel_hdf5(galcat, plot_logmhost, plot_halo_radius, plot_halo_pos, plot_halo_vel, 
                        output_path, rank, size, comm, Lbox):
-    import h5py
-    """Write galaxy catalog using parallel HDF5 for multiple MPI ranks."""
+    """
+    Write galaxy catalog using parallel HDF5 for multiple MPI ranks.
     
-
+    Coordinates collective I/O operations across MPI ranks to write a single
+    HDF5 file containing galaxies and halos from all processes.
+    
+    Parameters
+    ----------
+    galcat : dict
+        Galaxy catalog from rgrspit_diffsky for this rank
+    plot_logmhost : array_like
+        Log10 halo masses for this rank
+    plot_halo_radius : array_like  
+        Halo virial radii for this rank in Mpc/h
+    plot_halo_pos : array_like, shape (N_halos, 3)
+        Halo positions for this rank in Mpc/h
+    plot_halo_vel : array_like, shape (N_halos, 3)
+        Halo velocities for this rank in km/s
+    output_path : str
+        Full path for output HDF5 file
+    rank : int
+        MPI rank of this process
+    size : int
+        Total number of MPI processes
+    comm : MPI.Comm
+        MPI communicator for collective operations
+    Lbox : float
+        Simulation box size in Mpc/h
+        
+    Notes
+    -----
+    - Uses MPI collective operations to coordinate writes
+    - Gathers counts and calculates offsets for contiguous data layout
+    - All ranks write to same file using parallel HDF5
+    - Rank 0 writes metadata and creates file structure
+    - Includes temporary rank files cleanup after successful write
+    - Handles galaxy and halo data with proper offset calculations
+    """
+    from . import CURRENT_Z_OBS, LGMP_MIN, SIMULATION_BOX, CURRENT_PHASE, CURRENT_REDSHIFT
+    
     # Step 1: Gather galaxy and halo counts from all ranks
     local_n_galaxies = len(galcat['pos'])
     local_n_halos = len(plot_logmhost)
@@ -421,7 +309,7 @@ def write_parallel_hdf5(galcat, plot_logmhost, plot_halo_radius, plot_halo_pos, 
 
 
 def combine_mpi_files(output_path, size):
-    """Combine MPI rank files into final HDF5 catalog"""
+    """Combine MPI rank files into final HDF5 catalog (legacy function - not used in parallel HDF5)"""
     base_path, ext = os.path.splitext(output_path)
     
     # Read first file to get structure
@@ -497,46 +385,4 @@ def combine_mpi_files(output_path, size):
         rank_path = f"{base_path}_rank{rank:04d}{ext}"
         if os.path.exists(rank_path):
             os.remove(rank_path)
-            print(f"Removed temporary file: {rank_path}")
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument(
-        "machine", help="Machine name where script is run", choices=["nersc", "poboy"]
-    )
-
-    parser.add_argument("drnout", help="Output directory")
-    
-    parser.add_argument("--test", type=int, help="Test mode: use only N halos with smallest x coordinates")
-
-    args = parser.parse_args()
-    machine = args.machine
-    drnout = args.drnout
-    n_gen = args.test
-
-    if machine == "nersc":
-        # Build path for current configuration
-        catalog_path = build_abacus_path(
-            ABACUS_BASE_PATH, SIMULATION_SUITE, SIMULATION_BOX, 
-            CURRENT_PHASE, CURRENT_REDSHIFT
-        )
-        
-        # Verify path exists
-        if not os.path.isdir(catalog_path):
-            raise FileNotFoundError(f"AbacusSummit catalog not found: {catalog_path}")
-        
-        # Generate output filename
-        if n_gen is not None:
-            output_filename = f"mock_{SIMULATION_BOX}_{CURRENT_PHASE}_{CURRENT_REDSHIFT}_test{n_gen}.hdf5"
-        else:
-            output_filename = f"mock_{SIMULATION_BOX}_{CURRENT_PHASE}_{CURRENT_REDSHIFT}.hdf5"
-        output_path = os.path.join(drnout, output_filename)
-        
-        # Generate galaxy catalog (JAX ops moved inside function)
-        galcat = generate_mock_for_catalog(catalog_path, output_path, n_gen)
-        print(f"Generated {len(galcat['pos'])} galaxies total")
-        
-    elif machine == "poboy":
-        raise NotImplementedError("poboy machine not yet implemented")
+            print(f"Cleaned temporary file: {rank_path}")
