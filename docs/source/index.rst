@@ -1,7 +1,7 @@
-Covariance Mocks Pipeline Documentation
-=======================================
+Roman Galaxy Redshift Survey (GRS) Covariance Mocks Documentation
+==================================================================
 
-A modular pipeline for generating mock galaxy catalogs using the rgrspit_diffsky package with MPI support on HPC systems.
+A modular pipeline for generating mock galaxy catalogs for the **Roman Galaxy Redshift Survey (GRS)** using the rgrspit_diffsky package. This pipeline is part of the **Roman GRS Project Infrastructure Team (PIT)** analysis framework and runs on the **Perlmutter system at NERSC**.
 
 .. toctree::
    :maxdepth: 2

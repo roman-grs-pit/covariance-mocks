@@ -4,7 +4,7 @@ User Guide
 Pipeline Overview
 -----------------
 
-The covariance mocks pipeline is designed for generating mock galaxy catalogs from AbacusSummit N-body simulations. The pipeline consists of modular components that handle different aspects of the mock generation process.
+The **Roman Galaxy Redshift Survey (GRS)** covariance mocks pipeline is designed for generating mock galaxy catalogs from AbacusSummit N-body simulations as part of the **Roman GRS Project Infrastructure Team (PIT)** analysis framework. The pipeline consists of modular components that handle different aspects of the mock generation process and runs on the **Perlmutter system at NERSC**.
 
 Architecture
 ~~~~~~~~~~~~

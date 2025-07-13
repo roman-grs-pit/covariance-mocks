@@ -1,8 +1,8 @@
-# API Documentation
+# Roman GRS Covariance Mocks API Documentation
 
 **📖 Complete API Documentation**: [https://grs-pit-covariance-mocks.readthedocs.io/en/latest/api.html](https://grs-pit-covariance-mocks.readthedocs.io/en/latest/api.html)
 
-This document provides a quick reference for the covariance mocks modular pipeline. For comprehensive documentation with examples, usage patterns, and detailed parameter descriptions, visit the full documentation on Read the Docs.
+This document provides a quick reference for the **Roman Galaxy Redshift Survey (GRS)** covariance mocks modular pipeline, developed for the **Roman GRS Project Infrastructure Team (PIT)** on **Perlmutter at NERSC**. For comprehensive documentation with examples, usage patterns, and detailed parameter descriptions, visit the full documentation on Read the Docs.
 
 ## Quick Reference
 

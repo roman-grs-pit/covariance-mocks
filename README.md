@@ -1,6 +1,8 @@
-# Roman GRS PIT Covariance Mocks
+# Roman Galaxy Redshift Survey (GRS) Covariance Mocks
 
-Modular pipeline for generating mock galaxy catalogs from AbacusSummit halo catalogs using the rgrspit_diffsky package. This code generates large-scale covariance mocks for the Roman Galactic Redshift Survey (GRS) Project Infrastructure Team (PIT) analysis.
+Modular pipeline for generating mock galaxy catalogs from AbacusSummit halo catalogs using the rgrspit_diffsky package. This code generates large-scale covariance mocks for the **Roman Galaxy Redshift Survey (GRS)** as part of the **Roman GRS Project Infrastructure Team (PIT)** analysis pipeline.
+
+**System Requirements**: Designed to run on the **Perlmutter system at NERSC** under the Roman GRS PIT account (m4943).
 
 **📖 Full Documentation**: [https://grs-pit-covariance-mocks.readthedocs.io](https://grs-pit-covariance-mocks.readthedocs.io)
 
@@ -14,7 +16,7 @@ The pipeline uses a **modular architecture** with core functionality organized i
 - **`mpi_setup.py`** - MPI initialization and domain decomposition
 - **`utils.py`** - Shared utilities and configuration
 
-## Quick Start at NERSC
+## Quick Start on Perlmutter (NERSC)
 
 ### Generate Mock Catalog and Figure
 
@@ -87,11 +89,50 @@ For comprehensive information, see the **[full documentation on Read the Docs](h
 - **[API Reference](https://grs-pit-covariance-mocks.readthedocs.io/en/latest/api.html)** - Complete function and module documentation
 - **[Development Guide](https://grs-pit-covariance-mocks.readthedocs.io/en/latest/development.html)** - Contributing and development setup
 
+## Testing
+
+The project includes comprehensive testing with pytest integration and SLURM validation:
+
+### Quick Development Testing (< 5 minutes)
+```bash
+source scripts/load_env.sh
+pytest -m "unit or (system and not slow)" -v
+```
+
+### Long Validation Testing (Background)
+```bash
+# Load environment
+source scripts/load_env.sh
+
+# Run validation tests in background (30+ minutes)
+nohup pytest -m "slow or validation" -v --timeout=1800 > validation.log 2>&1 &
+
+# Monitor progress
+tail -f validation.log
+
+# Test against reference catalog
+python scripts/run_validation.py generate /tmp/validation_test
+```
+
+### Test Categories
+- **Unit Tests**: Fast tests with mocked SLURM calls (< 1 minute)
+- **System Tests**: SLURM integration tests (5-15 minutes)
+- **Validation Tests**: Compare against reference catalogs (30+ minutes)
+- **Shell Script Tests**: Verify workflow compatibility
+
+### Development Workflow
+- **Daily development**: `pytest -m unit -v` (< 1 minute)
+- **Pre-commit**: `pytest -m "unit or (system and not slow)" -v` (< 5 minutes)
+- **Before releases**: Run validation tests in background
+
+See `TESTING.md` for detailed testing procedures and `CLAUDE.md` for development workflow.
+
 ## Environment
 
-The pipeline requires:
-- NERSC Perlmutter system with GPU nodes
+The pipeline is specifically designed for the **Roman GRS Project Infrastructure Team (PIT)** and requires:
+- **NERSC Perlmutter system** with GPU nodes (account m4943)
 - Conda environment with JAX, rgrspit_diffsky, and scientific Python stack
 - MPI support with parallel HDF5
+- Access to Roman GRS PIT data and computational resources
 
 See the [Installation Guide](https://grs-pit-covariance-mocks.readthedocs.io/en/latest/installation.html) for detailed setup instructions.

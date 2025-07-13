@@ -1,17 +1,17 @@
-Quick Start
-===========
+Quick Start on Perlmutter (NERSC)
+=================================
 
-Basic Usage
------------
+Basic Usage for Roman GRS PIT
+------------------------------
 
-Generate a mock galaxy catalog with the main pipeline script:
+Generate a mock galaxy catalog for the Roman Galaxy Redshift Survey on Perlmutter:
 
 .. code-block:: bash
 
-   # Load environment
+   # Load environment on Perlmutter
    source scripts/load_env.sh
    
-   # Run mock generation
+   # Run mock generation (Roman GRS PIT account)
    python scripts/generate_single_mock.py nersc /path/to/output/directory
 
 The script will:
@@ -24,32 +24,29 @@ The script will:
 Testing
 -------
 
-Run the test suite to verify functionality:
+**Quick Development Testing** (< 5 minutes):
 
 .. code-block:: bash
 
-   # Run all tests
-   pytest
+   # Load environment
+   source scripts/load_env.sh
    
-   # Run with coverage report
-   pytest -v --cov --cov-report html
-   open htmlcov/index.html
+   # Fast development tests only
+   pytest -m "unit or (system and not slow)" -v
 
-Code Quality
-------------
-
-The project uses several code quality tools:
+**Long Validation Testing** (background execution):
 
 .. code-block:: bash
 
-   # Format code with black (line length: 88)
-   black .
+   # Load environment
+   source scripts/load_env.sh
+   
+   # Run validation tests in background
+   nohup pytest -m "slow or validation" -v --timeout=1800 > validation.log 2>&1 &
+   
+   # Monitor progress
+   tail -f validation.log
 
-   # Sort imports with isort
-   isort .
-
-   # Lint with flake8
-   flake8 .
 
 Example Workflow
 ----------------
