@@ -2,7 +2,7 @@
 Covariance Mocks Pipeline
 
 Modular pipeline for generating mock galaxy catalogs for covariance analysis.
-Supports large-scale production runs (40,000+ mock generations).
+Supports large-scale productions (40,000+ mock generations).
 """
 
 __version__ = "0.1.0"
@@ -25,10 +25,10 @@ except ImportError:
     # Optional module imports
     pass
 
-# Import campaign management modules
+# Import production management modules
 try:
-    from .campaign_config import CampaignConfigValidator, CampaignConfigLoader, validate_campaign_config
-    from .campaign_manager import CampaignManager, JobDatabase, JobSpec, BatchSpec, JobStatus
+    from .production_config import ProductionConfigValidator, ProductionConfigLoader, validate_production_config
+    from .production_manager import ProductionManager, JobDatabase, JobSpec, BatchSpec, JobStatus
 except ImportError:
-    # Campaign management modules not available
+    # Production management modules not available
     pass

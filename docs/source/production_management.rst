@@ -1,12 +1,12 @@
-Campaign Management
+Production Management
 ===================
 
-The covariance-mocks pipeline includes a campaign management system for large-scale mock generation campaigns with thousands of individual jobs. This system provides configuration management, batch job orchestration, failure recovery, and progress monitoring.
+The covariance-mocks pipeline includes a production management system for large-scale mock generation productions with thousands of individual jobs. This system provides configuration management, batch job orchestration, failure recovery, and progress monitoring.
 
 Overview
 --------
 
-A **campaign** is a coordinated collection of mock generation jobs that share common scientific parameters and execution settings. Campaigns handle the scale requirements of covariance analysis, which typically requires:
+A **production** is a coordinated collection of mock generation jobs that share common scientific parameters and execution settings. Productions handle the scale requirements of covariance analysis, which typically requires:
 
 * 2,000 realizations × 20 snapshots = 40,000 individual mock runs
 * Systematic batch management for SLURM job arrays
@@ -18,7 +18,7 @@ Key Features
 ------------
 
 **Hierarchical Configuration System**
-  YAML-based configuration with machine-specific defaults and campaign-specific overrides
+  YAML-based configuration with machine-specific defaults and production-specific overrides
 
 **Declarative Resource Specification**
   Abstract job types (``cpu_intensive``, ``gpu_intensive``, etc.) mapped to machine-specific resources
@@ -29,21 +29,21 @@ Key Features
 **Failure Recovery**
   Automatic retry mechanisms with exponential backoff
 
-**Campaign-Centric Organization**
+**Production-Centric Organization**
   Structured output directories with metadata, logs, and quality assurance
 
 Configuration System
 --------------------
 
-Campaign configurations use a hierarchical YAML structure with clear separation of concerns:
+Production configurations use a hierarchical YAML structure with clear separation of concerns:
 
 Configuration Schema
 ~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: yaml
 
-   campaign:
-     name: "campaign_identifier"
+   production:
+     name: "production_identifier"
      version: "v1.0"
      description: "Human-readable description"
      tags: ["production", "covariance"]
@@ -69,7 +69,7 @@ Configuration Schema
        initial_delay_minutes: 10.0
 
    outputs:
-     base_path: "/global/cfs/cdirs/m4943/Simulations/covariance_mocks/campaigns"
+     base_path: "/global/cfs/cdirs/m4943/Simulations/covariance_mocks/productions"
      structure: "hierarchical"
      compression: "gzip"
      cleanup_policy:
@@ -109,59 +109,59 @@ Machine-specific defaults are loaded automatically based on the target system:
 Usage Examples
 --------------
 
-Creating a Test Campaign
+Creating a Test Production
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
-   # Initialize test campaign
-   python scripts/run_campaign.py init config/examples/test_campaign.yaml
+   # Initialize test production
+   python scripts/run_production.py init config/examples/test_production.yaml
 
    # Submit jobs to SLURM
-   python scripts/run_campaign.py submit config/examples/test_campaign.yaml
+   python scripts/run_production.py submit config/examples/test_production.yaml
 
    # Monitor progress
-   python scripts/run_campaign.py status config/examples/test_campaign.yaml --verbose
+   python scripts/run_production.py status config/examples/test_production.yaml --verbose
 
-Production Campaign Workflow
+Production Workflow
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
-   # 1. Initialize production campaign
-   python scripts/run_campaign.py init config/examples/production_campaign.yaml
+   # 1. Initialize production 
+   python scripts/run_production.py init config/examples/production.yaml
 
    # 2. Submit initial batch of jobs
-   python scripts/run_campaign.py submit config/examples/production_campaign.yaml
+   python scripts/run_production.py submit config/examples/production.yaml
 
-   # 3. Monitor campaign in real-time
-   python scripts/run_campaign.py monitor config/examples/production_campaign.yaml --interval 60
+   # 3. Monitor production in real-time
+   python scripts/run_production.py monitor config/examples/production.yaml --interval 60
 
    # 4. Handle failures (in separate terminal)
-   python scripts/run_campaign.py retry config/examples/production_campaign.yaml --submit
+   python scripts/run_production.py retry config/examples/production.yaml --submit
 
-Campaign Management API
+Production Management API
 ------------------------
 
-The campaign system can also be used programmatically:
+The production system can also be used programmatically:
 
 .. code-block:: python
 
-   from covariance_mocks.campaign_manager import CampaignManager
+   from covariance_mocks.production_manager import ProductionManager
 
-   # Initialize campaign manager
-   manager = CampaignManager("config/examples/production_campaign.yaml", machine="nersc")
+   # Initialize production manager
+   manager = ProductionManager("config/examples/production.yaml", machine="nersc")
 
    # Create all job specifications
-   jobs_created = manager.initialize_campaign()
+   jobs_created = manager.initialize_production()
    print(f"Created {jobs_created} jobs")
 
    # Submit pending jobs in batches
    submitted_batches = manager.submit_pending_jobs()
    print(f"Submitted {len(submitted_batches)} batches")
 
-   # Check campaign status
-   summary = manager.get_campaign_summary()
+   # Check production status
+   summary = manager.get_production_summary()
    print(f"Success rate: {summary['statistics']['success_rate']:.1%}")
 
    # Retry failed jobs
@@ -171,11 +171,11 @@ The campaign system can also be used programmatically:
 Output Organization
 -------------------
 
-Campaigns create a structured output directory hierarchy:
+Productions create a structured output directory hierarchy:
 
 .. code-block:: text
 
-   campaigns/v1.0_covariance_v1/
+   productions/v1.0_covariance_v1/
    ├── catalogs/           # Generated mock catalogs
    │   ├── r0000/
    │   │   ├── mock_z0.500.hdf5
@@ -183,9 +183,9 @@ Campaigns create a structured output directory hierarchy:
    │   │   └── ...
    │   ├── r0001/
    │   └── ...
-   ├── metadata/           # Campaign configuration and tracking
-   │   ├── campaign_config.yaml
-   │   └── campaign.db
+   ├── metadata/           # Production configuration and tracking
+   │   ├── production_config.yaml
+   │   └── production.db
    ├── logs/               # SLURM job logs
    │   ├── batch_0000_*.out
    │   ├── batch_0000_*.err
@@ -197,7 +197,7 @@ Campaigns create a structured output directory hierarchy:
 Job Tracking and Recovery
 -------------------------
 
-The campaign system uses SQLite for persistent job tracking:
+The production system uses SQLite for persistent job tracking:
 
 **Job States**
   * ``PENDING``: Job created but not submitted
@@ -210,7 +210,7 @@ The campaign system uses SQLite for persistent job tracking:
 **Failure Recovery**
   Jobs are automatically retried according to the retry policy:
   
-  * Maximum retry attempts configurable per campaign
+  * Maximum retry attempts configurable per production
   * Exponential backoff between retry attempts
   * Jobs exceeding max retries remain in ``FAILED`` state
 
@@ -219,22 +219,22 @@ The campaign system uses SQLite for persistent job tracking:
   
   * Automatic detection of job state changes
   * Output file validation for completion confirmation
-  * Campaign-wide statistics and success rates
+  * Production-wide statistics and success rates
 
 Best Practices
 --------------
 
 **Development Workflow**
-  1. Start with test campaigns using small job counts
+  1. Start with test productions using small job counts
   2. Validate configuration and resource requirements
   3. Test failure recovery mechanisms
   4. Scale to production once validated
 
-**Production Campaigns**
+**Productions**
   1. Use hierarchical output organization
   2. Set appropriate timeout values for job complexity
   3. Configure retry policies for expected failure rates
-  4. Monitor campaigns regularly during execution
+  4. Monitor productions regularly during execution
 
 **Resource Management**
   1. Use declarative job types rather than explicit resource specs
@@ -243,14 +243,14 @@ Best Practices
   4. Balance batch size with queue wait times
 
 **Debugging and Troubleshooting**
-  1. Check SLURM logs in the campaign logs/ directory
-  2. Use campaign database for detailed job history
-  3. Validate configuration files before large campaigns
+  1. Check SLURM logs in the production logs/ directory
+  2. Use production database for detailed job history
+  3. Validate configuration files before large productions
   4. Test retry mechanisms with intentionally failing jobs
 
 Configuration Reference
 -----------------------
 
-For complete configuration schema documentation, see the schema file at ``config/schemas/campaign_schema.yaml``. Example configurations are available in ``config/examples/``.
+For complete configuration schema documentation, see the schema file at ``config/schemas/production_schema.yaml``. Example configurations are available in ``config/examples/``.
 
-The campaign management system integrates seamlessly with the existing pipeline infrastructure while providing the scalability and reliability required for large-scale covariance mock generation.
+The production management system integrates seamlessly with the existing pipeline infrastructure while providing the scalability and reliability required for large-scale covariance mock generation.

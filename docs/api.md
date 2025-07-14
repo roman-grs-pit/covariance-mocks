@@ -13,8 +13,8 @@ The modular pipeline consists of 7 core modules:
 - **[`hdf5_writer`](https://grs-pit-covariance-mocks.readthedocs.io/en/latest/api.html#module-covariance_mocks.hdf5_writer)** - Parallel HDF5 output operations
 - **[`mpi_setup`](https://grs-pit-covariance-mocks.readthedocs.io/en/latest/api.html#module-covariance_mocks.mpi_setup)** - MPI and JAX initialization
 - **[`utils`](https://grs-pit-covariance-mocks.readthedocs.io/en/latest/api.html#module-covariance_mocks.utils)** - Common utility functions
-- **[`campaign_config`](https://grs-pit-covariance-mocks.readthedocs.io/en/latest/api.html#module-covariance_mocks.campaign_config)** - YAML configuration validation and hierarchical inheritance
-- **[`campaign_manager`](https://grs-pit-covariance-mocks.readthedocs.io/en/latest/api.html#module-covariance_mocks.campaign_manager)** - SQLite job tracking and SLURM array orchestration
+- **[`production_config`](https://grs-pit-covariance-mocks.readthedocs.io/en/latest/api.html#module-covariance_mocks.production_config)** - YAML configuration validation and hierarchical inheritance
+- **[`production_manager`](https://grs-pit-covariance-mocks.readthedocs.io/en/latest/api.html#module-covariance_mocks.production_manager)** - SQLite job tracking and SLURM array orchestration
 
 ## Essential Functions
 
@@ -64,8 +64,8 @@ finalize_mpi(comm, rank, size, MPI_AVAILABLE)
 
 ### Campaign Management
 ```python
-from covariance_mocks.campaign_config import CampaignConfig
-from covariance_mocks.campaign_manager import CampaignManager
+from covariance_mocks.production_config import ProductionConfig
+from covariance_mocks.production_manager import ProductionManager
 
 # Load and validate campaign configuration
 config = CampaignConfig.from_yaml('config/examples/production_campaign.yaml')

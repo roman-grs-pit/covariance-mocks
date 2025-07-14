@@ -180,4 +180,4 @@ source scripts/load_env.sh
 - Ensure SLURM environment is properly configured for system tests
 - Verify reference catalog path exists for validation tests
 
-For detailed troubleshooting and development protocols, see `CLAUDE.md`.
+For detailed troubleshooting, refer to the test output logs and error messages.

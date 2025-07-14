@@ -1,7 +1,7 @@
-"""Campaign management system for batch job orchestration.
+"""Production management system for batch job orchestration.
 
-This module provides the CampaignManager class for managing large-scale
-campaigns with thousands of individual jobs, including job tracking,
+This module provides the ProductionManager class for managing large-scale
+productions with thousands of individual jobs, including job tracking,
 failure recovery, and batch execution via SLURM.
 """
 
@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 import subprocess
 
-from .campaign_config import CampaignConfigLoader, ConfigurationError
+from .production_config import ProductionConfigLoader, ConfigurationError
 
 
 class JobStatus(Enum):
@@ -181,8 +181,8 @@ class JobDatabase:
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(f"UPDATE jobs SET {set_clause} WHERE job_id = ?", values)
     
-    def get_campaign_stats(self) -> Dict[str, int]:
-        """Get campaign statistics."""
+    def get_production_stats(self) -> Dict[str, int]:
+        """Get production statistics."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute("""
                 SELECT status, COUNT(*) FROM jobs GROUP BY status
@@ -195,37 +195,37 @@ class JobDatabase:
             return stats
 
 
-class CampaignManager:
-    """Manages campaign execution with batch job orchestration."""
+class ProductionManager:
+    """Manages production execution with batch job orchestration."""
     
-    def __init__(self, campaign_config_path: Path, machine: str = "nersc", 
+    def __init__(self, production_config_path: Path, machine: str = "nersc", 
                  work_dir: Optional[Path] = None):
-        """Initialize campaign manager.
+        """Initialize production manager.
         
         Args:
-            campaign_config_path: Path to campaign configuration file
+            production_config_path: Path to production configuration file
             machine: Machine name for defaults
-            work_dir: Working directory for campaign files (default: auto-generated)
+            work_dir: Working directory for production files (default: auto-generated)
         """
-        self.config_path = Path(campaign_config_path)
+        self.config_path = Path(production_config_path)
         self.machine = machine
         
         # Load and validate configuration
-        self.config_loader = CampaignConfigLoader()
-        self.config = self.config_loader.load_campaign_config(campaign_config_path, machine)
+        self.config_loader = ProductionConfigLoader()
+        self.config = self.config_loader.load_production_config(production_config_path, machine)
         
         # Set up working directory
         if work_dir is None:
-            campaign_name = self.config["campaign"]["name"]
-            campaign_version = self.config["campaign"]["version"]
+            production_name = self.config["production"]["name"]
+            production_version = self.config["production"]["version"]
             base_path = Path(self.config["outputs"]["base_path"])
-            work_dir = base_path / f"{campaign_version}_{campaign_name}"
+            work_dir = base_path / f"{production_version}_{production_name}"
         
         self.work_dir = Path(work_dir)
         self.work_dir.mkdir(parents=True, exist_ok=True)
         
         # Initialize job database
-        db_path = self.work_dir / "campaign.db"
+        db_path = self.work_dir / "production.db"
         self.job_db = JobDatabase(db_path)
         
         # Create output subdirectories
@@ -237,14 +237,36 @@ class CampaignManager:
         for directory in [self.catalogs_dir, self.metadata_dir, self.logs_dir, self.qa_dir]:
             directory.mkdir(parents=True, exist_ok=True)
         
-        # Save campaign configuration
-        config_file = self.metadata_dir / "campaign_config.yaml"
+        # Save production configuration
+        config_file = self.metadata_dir / "production_config.yaml"
         with open(config_file, 'w') as f:
             import yaml
             yaml.dump(self.config, f, default_flow_style=False)
+        
+        # Log dependency version information
+        self._log_dependency_versions()
     
-    def initialize_campaign(self) -> int:
-        """Initialize campaign by creating all job specifications.
+    def _log_dependency_versions(self):
+        """Log dependency version information for reproducibility."""
+        dependencies = self.config.get("production", {}).get("dependencies", {})
+        
+        if "rgrspit_diffsky" in dependencies:
+            print(f"Production initialized with rgrspit_diffsky version: {dependencies['rgrspit_diffsky']}")
+        
+        # Log to metadata file
+        version_info = {
+            "production_version": self.config["production"]["version"],
+            "dependencies": dependencies,
+            "initialized_at": datetime.utcnow().isoformat()
+        }
+        
+        # Save version info to metadata directory
+        version_file = self.metadata_dir / "version_info.json"
+        with open(version_file, 'w') as f:
+            json.dump(version_info, f, indent=2)
+    
+    def initialize_production(self) -> int:
+        """Initialize production by creating all job specifications.
         
         Returns:
             Number of jobs created
@@ -445,7 +467,7 @@ exit $EXIT_CODE
         """Check status of all jobs and update database.
         
         Returns:
-            Updated campaign statistics
+            Updated production statistics
         """
         # Query SLURM for running jobs
         try:
@@ -515,7 +537,7 @@ exit $EXIT_CODE
                         error_message="Job disappeared from SLURM queue without output"
                     )
         
-        return self.job_db.get_campaign_stats()
+        return self.job_db.get_production_stats()
     
     def retry_failed_jobs(self) -> int:
         """Retry failed jobs according to retry policy.
@@ -541,20 +563,20 @@ exit $EXIT_CODE
         
         return retried_count
     
-    def get_campaign_summary(self) -> Dict[str, Any]:
-        """Get comprehensive campaign summary.
+    def get_production_summary(self) -> Dict[str, Any]:
+        """Get comprehensive production summary.
         
         Returns:
-            Campaign summary with statistics and configuration
+            Production summary with statistics and configuration
         """
-        stats = self.job_db.get_campaign_stats()
+        stats = self.job_db.get_production_stats()
         total_jobs = sum(stats.values())
         
         completed = stats.get("completed", 0)
         failed = stats.get("failed", 0)
         
         summary = {
-            "campaign": self.config["campaign"],
+            "production": self.config["production"],
             "work_dir": str(self.work_dir),
             "statistics": {
                 "total_jobs": total_jobs,

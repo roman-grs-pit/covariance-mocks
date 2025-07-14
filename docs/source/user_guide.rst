@@ -19,8 +19,8 @@ The modular pipeline consists of 5 core modules:
 
 The campaign management system adds:
 
-* **campaign_config** - YAML configuration validation and hierarchical inheritance
-* **campaign_manager** - SQLite job tracking and SLURM array orchestration
+* **production_config** - YAML configuration validation and hierarchical inheritance
+* **production_manager** - SQLite job tracking and SLURM array orchestration
 
 Configuration
 -------------

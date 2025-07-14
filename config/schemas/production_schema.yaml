@@ -1,14 +1,14 @@
-# YAML Schema for Campaign Configuration
-# Defines the structure and validation rules for campaign configuration files
+# YAML Schema for Production Configuration
+# Defines the structure and validation rules for production configuration files
 
-campaign:
+production:
   type: object
   required: [name, version, description]
   properties:
     name:
       type: string
       pattern: "^[a-zA-Z][a-zA-Z0-9_-]*$"
-      description: "Campaign identifier (alphanumeric, underscore, hyphen)"
+      description: "Production identifier (alphanumeric, underscore, hyphen)"
     version:
       type: string
       pattern: "^v\\d+\\.\\d+(?:\\.\\d+)?(?:-[a-zA-Z0-9_-]+)?$"
@@ -17,12 +17,23 @@ campaign:
       type: string
       minLength: 10
       maxLength: 500
-      description: "Human-readable campaign description"
+      description: "Human-readable production description"
     tags:
       type: array
       items:
         type: string
       description: "Optional tags for categorization"
+    dependencies:
+      type: object
+      description: "Dependency version tracking for reproducibility"
+      properties:
+        rgrspit_diffsky:
+          type: string
+          description: "rgrspit_diffsky package version (auto-detected if not specified)"
+        record_environment:
+          type: boolean
+          default: true
+          description: "Whether to record full environment information"
 
 science:
   type: object
@@ -153,7 +164,7 @@ outputs:
   properties:
     base_path:
       type: string
-      description: "Base directory for campaign outputs"
+      description: "Base directory for production outputs"
     structure:
       type: string
       enum: ["flat", "hierarchical", "custom"]

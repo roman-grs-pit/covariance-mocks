@@ -1,12 +1,13 @@
-"""Campaign configuration validation and management.
+"""Production configuration validation and management.
 
-This module provides YAML schema validation for campaign configurations
+This module provides YAML schema validation for production configurations
 and hierarchical configuration loading with machine-specific defaults.
 """
 
 import os
 import re
 import yaml
+import importlib.metadata
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Union
 from dataclasses import dataclass
@@ -25,8 +26,8 @@ class ValidationError:
     value: Any = None
 
 
-class CampaignConfigValidator:
-    """Validates campaign configuration against schema."""
+class ProductionConfigValidator:
+    """Validates production configuration against schema."""
     
     def __init__(self, schema_path: Optional[Path] = None):
         """Initialize validator with schema file.
@@ -37,7 +38,7 @@ class CampaignConfigValidator:
         if schema_path is None:
             # Default to schema in same repository
             repo_root = Path(__file__).parent.parent.parent
-            schema_path = repo_root / "config" / "schemas" / "campaign_schema.yaml"
+            schema_path = repo_root / "config" / "schemas" / "production_schema.yaml"
         
         self.schema_path = schema_path
         self.schema = self._load_schema()
@@ -243,8 +244,8 @@ class CampaignConfigValidator:
         return errors
 
 
-class CampaignConfigLoader:
-    """Loads and merges campaign configurations with defaults."""
+class ProductionConfigLoader:
+    """Loads and merges production configurations with defaults."""
     
     def __init__(self, repo_root: Optional[Path] = None):
         """Initialize loader with repository root.
@@ -257,13 +258,13 @@ class CampaignConfigLoader:
         
         self.repo_root = Path(repo_root)
         self.defaults_dir = self.repo_root / "config" / "defaults"
-        self.validator = CampaignConfigValidator()
+        self.validator = ProductionConfigValidator()
     
-    def load_campaign_config(self, config_path: Union[str, Path], machine: str = "nersc") -> Dict[str, Any]:
-        """Load and validate campaign configuration.
+    def load_production_config(self, config_path: Union[str, Path], machine: str = "nersc") -> Dict[str, Any]:
+        """Load and validate production configuration.
         
         Args:
-            config_path: Path to campaign configuration file
+            config_path: Path to production configuration file
             machine: Machine name for defaults (default: "nersc")
             
         Returns:
@@ -275,11 +276,11 @@ class CampaignConfigLoader:
         # Load machine defaults
         machine_defaults = self._load_machine_defaults(machine)
         
-        # Load campaign configuration
-        campaign_config = self._load_yaml_file(config_path)
+        # Load production configuration
+        production_config = self._load_yaml_file(config_path)
         
-        # Merge configurations (campaign overrides defaults)
-        merged_config = self._merge_configs(machine_defaults, campaign_config)
+        # Merge configurations (production overrides defaults)
+        merged_config = self._merge_configs(machine_defaults, production_config)
         
         # Apply job type overrides if specified
         if "job_type_overrides" in machine_defaults and "execution" in merged_config:
@@ -289,6 +290,9 @@ class CampaignConfigLoader:
                 if "resources" not in merged_config:
                     merged_config["resources"] = {}
                 merged_config["resources"].update(overrides)
+        
+        # Enrich with dependency version information
+        merged_config = self._enrich_with_dependency_versions(merged_config)
         
         # Validate merged configuration
         errors = self.validator.validate(merged_config)
@@ -327,13 +331,80 @@ class CampaignConfigLoader:
                 result[key] = value
         
         return result
+    
+    def _detect_rgrspit_diffsky_version(self) -> str:
+        """Detect rgrspit_diffsky version from environment.
+        
+        Returns:
+            Version string from rgrspit_diffsky package
+            
+        Raises:
+            ConfigurationError: If rgrspit_diffsky is not available
+        """
+        try:
+            # First try importlib.metadata (recommended approach)
+            return importlib.metadata.version("rgrspit_diffsky")
+        except importlib.metadata.PackageNotFoundError:
+            try:
+                # Fallback to direct import
+                import rgrspit_diffsky
+                if hasattr(rgrspit_diffsky, '__version__'):
+                    return rgrspit_diffsky.__version__
+                else:
+                    raise ConfigurationError("rgrspit_diffsky package found but no version information")
+            except ImportError:
+                raise ConfigurationError("rgrspit_diffsky package not found in environment")
+    
+    def _validate_rgrspit_diffsky_version(self, config_version: str) -> None:
+        """Validate specified rgrspit_diffsky version against environment.
+        
+        Args:
+            config_version: Version specified in configuration
+            
+        Raises:
+            ConfigurationError: If versions don't match
+        """
+        detected_version = self._detect_rgrspit_diffsky_version()
+        if config_version != detected_version:
+            raise ConfigurationError(
+                f"rgrspit_diffsky version mismatch: "
+                f"config specifies '{config_version}' but environment has '{detected_version}'"
+            )
+    
+    def _enrich_with_dependency_versions(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Enrich configuration with dependency version information.
+        
+        Args:
+            config: Configuration dictionary to enrich
+            
+        Returns:
+            Configuration with dependency versions added
+        """
+        # Ensure production section exists
+        if "production" not in config:
+            config["production"] = {}
+        
+        # Ensure dependencies section exists
+        if "dependencies" not in config["production"]:
+            config["production"]["dependencies"] = {}
+        
+        dependencies = config["production"]["dependencies"]
+        
+        # Auto-detect rgrspit_diffsky version if not specified
+        if "rgrspit_diffsky" not in dependencies:
+            dependencies["rgrspit_diffsky"] = self._detect_rgrspit_diffsky_version()
+        else:
+            # Validate specified version against environment
+            self._validate_rgrspit_diffsky_version(dependencies["rgrspit_diffsky"])
+        
+        return config
 
 
-def validate_campaign_config(config_path: Union[str, Path], machine: str = "nersc") -> Dict[str, Any]:
-    """Convenience function to load and validate campaign configuration.
+def validate_production_config(config_path: Union[str, Path], machine: str = "nersc") -> Dict[str, Any]:
+    """Convenience function to load and validate production configuration.
     
     Args:
-        config_path: Path to campaign configuration file
+        config_path: Path to production configuration file
         machine: Machine name for defaults
         
     Returns:
@@ -342,5 +413,5 @@ def validate_campaign_config(config_path: Union[str, Path], machine: str = "ners
     Raises:
         ConfigurationError: If validation fails
     """
-    loader = CampaignConfigLoader()
-    return loader.load_campaign_config(config_path, machine)
+    loader = ProductionConfigLoader()
+    return loader.load_production_config(config_path, machine)

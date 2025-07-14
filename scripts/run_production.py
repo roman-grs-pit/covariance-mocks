@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Campaign runner script for launching and managing large-scale campaigns.
+"""Production runner script for launching and managing large-scale productions.
 
-This script provides a command-line interface for the campaign management system,
-allowing users to initialize, submit, monitor, and retry campaign jobs.
+This script provides a command-line interface for the production management system,
+allowing users to initialize, submit, monitor, and retry production jobs.
 """
 
 import sys
@@ -14,28 +14,28 @@ from pathlib import Path
 # Add src directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from covariance_mocks.campaign_manager import CampaignManager, JobStatus
-from covariance_mocks.campaign_config import ConfigurationError
+from covariance_mocks.production_manager import ProductionManager, JobStatus
+from covariance_mocks.production_config import ConfigurationError
 
 
-def initialize_campaign(args):
-    """Initialize a new campaign."""
+def initialize_production(args):
+    """Initialize a new production."""
     try:
-        manager = CampaignManager(args.config, args.machine, args.work_dir)
+        manager = ProductionManager(args.config, args.machine, args.work_dir)
         
         print(f"Initializing campaign from {args.config}")
         print(f"Machine: {args.machine}")
         print(f"Work directory: {manager.work_dir}")
         
-        jobs_created = manager.initialize_campaign()
+        jobs_created = manager.initialize_production()
         print(f"Created {jobs_created} jobs")
         
-        # Save campaign info
-        summary = manager.get_campaign_summary()
-        print(f"\nCampaign Summary:")
-        print(f"  Name: {summary['campaign']['name']}")
-        print(f"  Version: {summary['campaign']['version']}")
-        print(f"  Description: {summary['campaign']['description']}")
+        # Save production info
+        summary = manager.get_production_summary()
+        print(f"\nProduction Summary:")
+        print(f"  Name: {summary['production']['name']}")
+        print(f"  Version: {summary['production']['version']}")
+        print(f"  Description: {summary['production']['description']}")
         print(f"  Total jobs: {summary['statistics']['total_jobs']}")
         
         return 0
@@ -51,7 +51,7 @@ def initialize_campaign(args):
 def submit_jobs(args):
     """Submit pending jobs to SLURM."""
     try:
-        manager = CampaignManager(args.config, args.machine, args.work_dir)
+        manager = ProductionManager(args.config, args.machine, args.work_dir)
         
         print(f"Submitting pending jobs for campaign in {manager.work_dir}")
         
@@ -81,14 +81,14 @@ def submit_jobs(args):
 def check_status(args):
     """Check campaign status."""
     try:
-        manager = CampaignManager(args.config, args.machine, args.work_dir)
+        manager = ProductionManager(args.config, args.machine, args.work_dir)
         
         print(f"Checking status for campaign in {manager.work_dir}")
         
         stats = manager.check_job_status()
-        summary = manager.get_campaign_summary()
+        summary = manager.get_production_summary()
         
-        print(f"\nCampaign: {summary['campaign']['name']} {summary['campaign']['version']}")
+        print(f"\nCampaign: {summary['production']['name']} {summary['production']['version']}")
         print(f"Total jobs: {summary['statistics']['total_jobs']}")
         print(f"Success rate: {summary['statistics']['success_rate']:.1%}")
         
@@ -115,7 +115,7 @@ def check_status(args):
 def retry_failed(args):
     """Retry failed jobs."""
     try:
-        manager = CampaignManager(args.config, args.machine, args.work_dir)
+        manager = ProductionManager(args.config, args.machine, args.work_dir)
         
         print(f"Retrying failed jobs for campaign in {manager.work_dir}")
         
@@ -139,10 +139,10 @@ def retry_failed(args):
         return 1
 
 
-def monitor_campaign(args):
-    """Monitor campaign progress continuously."""
+def monitor_production(args):
+    """Monitor production progress continuously."""
     try:
-        manager = CampaignManager(args.config, args.machine, args.work_dir)
+        manager = ProductionManager(args.config, args.machine, args.work_dir)
         
         print(f"Monitoring campaign in {manager.work_dir}")
         print(f"Update interval: {args.interval} seconds")
@@ -151,13 +151,13 @@ def monitor_campaign(args):
         try:
             while True:
                 stats = manager.check_job_status()
-                summary = manager.get_campaign_summary()
+                summary = manager.get_production_summary()
                 
                 # Clear screen and show status
                 print("\033[2J\033[H", end="")  # Clear screen
                 print(f"Campaign Monitor - {time.strftime('%Y-%m-%d %H:%M:%S')}")
                 print("=" * 60)
-                print(f"Campaign: {summary['campaign']['name']} {summary['campaign']['version']}")
+                print(f"Campaign: {summary['production']['name']} {summary['production']['version']}")
                 print(f"Total jobs: {summary['statistics']['total_jobs']}")
                 print(f"Success rate: {summary['statistics']['success_rate']:.1%}")
                 print()
@@ -221,7 +221,7 @@ Examples:
     # Initialize command
     init_parser = subparsers.add_parser("init", help="Initialize new campaign")
     init_parser.add_argument("config", type=Path, help="Campaign configuration file")
-    init_parser.set_defaults(func=initialize_campaign)
+    init_parser.set_defaults(func=initialize_production)
     
     # Submit command
     submit_parser = subparsers.add_parser("submit", help="Submit pending jobs")
@@ -244,7 +244,7 @@ Examples:
     monitor_parser = subparsers.add_parser("monitor", help="Monitor campaign progress")
     monitor_parser.add_argument("config", type=Path, help="Campaign configuration file")
     monitor_parser.add_argument("--interval", type=int, default=60, help="Update interval in seconds (default: 60)")
-    monitor_parser.set_defaults(func=monitor_campaign)
+    monitor_parser.set_defaults(func=monitor_production)
     
     args = parser.parse_args()
     

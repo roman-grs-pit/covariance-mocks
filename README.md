@@ -15,8 +15,8 @@ The pipeline uses a **modular architecture** with core functionality organized i
 - **`hdf5_writer.py`** - Parallel HDF5 output with MPI collective I/O
 - **`mpi_setup.py`** - MPI initialization and domain decomposition
 - **`utils.py`** - Shared utilities and configuration
-- **`campaign_config.py`** - YAML configuration validation and hierarchical inheritance
-- **`campaign_manager.py`** - SQLite job tracking and SLURM array orchestration
+- **`production_config.py`** - YAML configuration validation and hierarchical inheritance
+- **`production_manager.py`** - SQLite job tracking and SLURM array orchestration
 
 ## Installation
 
@@ -156,7 +156,7 @@ python scripts/run_validation.py generate /tmp/validation_test
 - **Pre-commit**: `pytest -m "unit or (system and not slow)" -v` (< 5 minutes)
 - **Before releases**: Run validation tests in background
 
-See `TESTING.md` for detailed testing procedures and `CLAUDE.md` for development workflow.
+See `TESTING.md` for detailed testing procedures.
 
 ## Environment
 
