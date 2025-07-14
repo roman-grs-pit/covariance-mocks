@@ -1,0 +1,78 @@
+# NERSC Perlmutter Default Configuration
+# Machine-specific defaults for NERSC Perlmutter system
+
+resources:
+  account: "m4943"
+  partition: "regular"
+  constraint: "cpu"
+  nodes_per_job: 1
+  tasks_per_node: 128
+  cpus_per_task: 1
+  memory_gb: 250.0
+  gpus_per_node: 0
+
+execution:
+  job_type: "cpu_intensive"
+  batch_size: 500
+  timeout_hours: 12.0
+  retry_policy:
+    max_retries: 3
+    backoff_multiplier: 2.0
+    initial_delay_minutes: 5.0
+
+outputs:
+  base_path: "/global/cfs/cdirs/m4943/Simulations/covariance_mocks"
+  structure: "hierarchical"
+  compression: "gzip"
+  cleanup_policy:
+    keep_logs_days: 30
+    keep_intermediate: false
+    archive_completed: false
+
+# Job type resource mappings for NERSC Perlmutter
+job_type_overrides:
+  cpu_intensive:
+    partition: "regular"
+    constraint: "cpu"
+    nodes_per_job: 1
+    tasks_per_node: 128
+    cpus_per_task: 1
+    memory_gb: 250.0
+    timeout_hours: 12.0
+    
+  gpu_intensive:
+    partition: "gpu"
+    constraint: "gpu"
+    nodes_per_job: 1
+    tasks_per_node: 4
+    cpus_per_task: 32
+    memory_gb: 240.0
+    gpus_per_node: 4
+    timeout_hours: 6.0
+    
+  memory_intensive:
+    partition: "regular"
+    constraint: "cpu"
+    nodes_per_job: 1
+    tasks_per_node: 64
+    cpus_per_task: 2
+    memory_gb: 500.0
+    timeout_hours: 24.0
+    
+  io_intensive:
+    partition: "regular"
+    constraint: "cpu"
+    nodes_per_job: 2
+    tasks_per_node: 64
+    cpus_per_task: 2
+    memory_gb: 250.0
+    timeout_hours: 8.0
+    
+  balanced:
+    partition: "regular"
+    constraint: "cpu"
+    nodes_per_job: 1
+    tasks_per_node: 64
+    cpus_per_task: 2
+    memory_gb: 250.0
+    timeout_hours: 12.0

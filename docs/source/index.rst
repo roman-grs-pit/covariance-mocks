@@ -10,6 +10,7 @@ A modular pipeline for generating mock galaxy catalogs for the **Roman Galaxy Re
    installation
    quickstart
    user_guide
+   campaign_management
    api
    development
 

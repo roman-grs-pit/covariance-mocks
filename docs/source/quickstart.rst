@@ -1,25 +1,57 @@
 Quick Start on Perlmutter (NERSC)
 =================================
 
-Basic Usage for Roman GRS PIT
-------------------------------
+Installation and Setup
+-----------------------
 
-Generate a mock galaxy catalog for the Roman Galaxy Redshift Survey on Perlmutter:
+First, clone the repository and set up the environment:
 
 .. code-block:: bash
 
+   # Clone the repository
+   git clone https://github.com/roman-grs-pit/covariance-mocks.git
+   cd covariance-mocks
+   
    # Load environment on Perlmutter
    source scripts/load_env.sh
-   
-   # Run mock generation (Roman GRS PIT account)
+
+Basic Usage for Roman GRS PIT
+------------------------------
+
+Generate a single mock galaxy catalog for the Roman Galaxy Redshift Survey on Perlmutter:
+
+.. code-block:: bash
+
+   # Run single mock generation (Roman GRS PIT account)
    python scripts/generate_single_mock.py nersc /path/to/output/directory
 
-The script will:
+For large-scale campaigns with thousands of jobs, use the campaign management system:
+
+.. code-block:: bash
+
+   # Initialize campaign configuration
+   python scripts/run_campaign.py init my_campaign config/examples/production_campaign.yaml
+   
+   # Submit campaign jobs to SLURM
+   python scripts/run_campaign.py submit my_campaign
+   
+   # Monitor campaign progress  
+   python scripts/run_campaign.py status my_campaign
+
+The single mock generation script will:
 
 1. Load AbacusSummit halo catalogs
 2. Apply filtering and slab decomposition for MPI
 3. Generate galaxies using rgrspit_diffsky
 4. Write results to HDF5 format
+
+The campaign management system will:
+
+1. Parse YAML configuration files
+2. Create SQLite database for job tracking
+3. Submit SLURM array jobs with specified parameters
+4. Monitor job progress and handle failures
+5. Organize output files by campaign version
 
 Testing
 -------

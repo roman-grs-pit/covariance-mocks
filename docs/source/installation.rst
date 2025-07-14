@@ -1,10 +1,21 @@
 Installation
 ============
 
+Clone Repository
+----------------
+
+First, clone the repository on Perlmutter:
+
+.. code-block:: bash
+
+   # Clone the repository
+   git clone https://github.com/roman-grs-pit/covariance-mocks.git
+   cd covariance-mocks
+
 System Requirements
 -------------------
 
-This pipeline is designed specifically for the **Roman Galaxy Redshift Survey (GRS) Project Infrastructure Team (PIT)** and requires:
+This pipeline is built for the **Roman Galaxy Redshift Survey (GRS) Project Infrastructure Team (PIT)** and requires:
 
 * **NERSC Perlmutter system** with GPU nodes
 * **Roman GRS PIT account access** (m4943)
@@ -21,6 +32,8 @@ Load the conda environment and HPC modules on Perlmutter:
    echo $CONDA_ENV
 
 This will load the conda environment with all necessary dependencies and configure the HPC modules for parallel processing on the Perlmutter system.
+
+The environment includes the covariance-mocks package installed in development mode with all campaign management capabilities.
 
 Dependencies
 ------------
@@ -39,9 +52,11 @@ The conda environment contains all necessary packages including:
 * NumPy for numerical computations
 * Specialized astrophysics packages
 * h5py with MPI support for parallel HDF5 operations
+* PyYAML for campaign configuration management
+* SQLite for job tracking and state management
 
 Technical Requirements
----------------------
+-----------------------
 
 * **NERSC Perlmutter system** with SLURM job scheduler
 * MPI implementation (OpenMPI or MPICH)
@@ -63,6 +78,9 @@ Verify the installation with quick tests:
    
    # Test shell script functionality
    ./scripts/make_mocks.sh --test
+   
+   # Test campaign management system
+   python scripts/run_campaign.py --help
 
 For comprehensive validation (optional, run in background):
 

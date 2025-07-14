@@ -1,6 +1,6 @@
 # Testing Guide
 
-This document provides a quick reference for the testing procedures in the covariance-mocks project.
+This document provides a reference for the testing procedures in the covariance-mocks project.
 
 ## Prerequisites
 
@@ -11,7 +11,7 @@ source scripts/load_env.sh
 
 ## Quick Development Testing (< 5 minutes)
 
-For rapid development feedback, run only fast tests:
+For development feedback, run only fast tests:
 
 ```bash
 # Load environment
@@ -23,7 +23,7 @@ pytest -m "unit or (system and not slow)" -v
 
 ## Long Validation Testing (Background Execution)
 
-For comprehensive validation, run long tests in background:
+For validation, run long tests in background:
 
 ```bash
 # Load environment
@@ -50,7 +50,7 @@ pytest tests/test_integration_core.py -m unit -v
 # All unit tests across project  
 pytest -m unit -v
 ```
-**Goal**: Fast validation of core logic without HPC resources
+**Goal**: Validation of core logic without HPC resources
 
 ### 2. System Tests (Requires SLURM)
 Test with actual SLURM job submission:
@@ -94,7 +94,7 @@ python tests/integration_core.py /tmp/direct_test --test
 
 ### Development Workflow (Fast)
 ```bash
-# Quick unit tests (< 1 minute)
+# Unit tests (< 1 minute)
 pytest -m unit -v
 
 # Fast development testing (< 5 minutes) 
