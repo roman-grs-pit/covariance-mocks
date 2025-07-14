@@ -1,0 +1,8 @@
+sphinx>=5.0
+sphinx-rtd-theme
+sphinx-autodoc-typehints
+myst-parser
+numpy
+jax[cpu]
+h5py
+mpi4py
