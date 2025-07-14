@@ -62,7 +62,7 @@ The testing architecture uses session-scoped fixtures to minimize pipeline execu
 
 **Reference Data Validation**:
 
-* **Reference catalog**: ``/global/cfs/cdirs/m4943/Simulations/covariance_mocks/data/validated/mock_AbacusSummit_small_c000_ph3000_z1.100.hdf5``
+* **Reference catalog**: ``/global/cfs/cdirs/m4943/Simulations/covariance_mocks/validation/validated/mock_AbacusSummit_small_c000_ph3000_z1.100.hdf5``
 * **HDF5 dataset comparison**: Exact equality for integers, tolerance-based for floating point
 * **Reproducibility testing**: Multiple runs produce identical results
 

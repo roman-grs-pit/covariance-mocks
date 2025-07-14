@@ -22,6 +22,7 @@ from .production_config import ProductionConfigLoader, ConfigurationError
 class JobStatus(Enum):
     """Job execution status."""
     PENDING = "pending"
+    STAGED = "staged"
     QUEUED = "queued"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -170,6 +171,44 @@ class JobDatabase:
             
             return jobs
     
+    def get_batches_by_status(self, status: JobStatus) -> List[BatchSpec]:
+        """Get all batches with specified status."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute("""
+                SELECT batch_id, job_ids, slurm_array_id, status, created_at, submitted_at
+                FROM batches WHERE status = ?
+                ORDER BY created_at
+            """, (status.value,))
+            
+            batches = []
+            for row in cursor:
+                batches.append(BatchSpec(
+                    batch_id=row[0],
+                    job_ids=json.loads(row[1]),
+                    slurm_array_id=row[2],
+                    status=JobStatus(row[3]),
+                    created_at=row[4],
+                    submitted_at=row[5]
+                ))
+            
+            return batches
+    
+    def update_batch_status(self, batch_id: str, status: JobStatus, slurm_array_id: Optional[int] = None):
+        """Update batch status and optionally SLURM array ID."""
+        with sqlite3.connect(self.db_path) as conn:
+            if slurm_array_id is not None:
+                conn.execute("""
+                    UPDATE batches 
+                    SET status = ?, slurm_array_id = ?, submitted_at = ?
+                    WHERE batch_id = ?
+                """, (status.value, slurm_array_id, datetime.utcnow().isoformat(), batch_id))
+            else:
+                conn.execute("""
+                    UPDATE batches 
+                    SET status = ?
+                    WHERE batch_id = ?
+                """, (status.value, batch_id))
+    
     def update_job_status(self, job_id: str, status: JobStatus, **kwargs):
         """Update job status and optional fields."""
         fields = {"status": status.value}
@@ -199,13 +238,14 @@ class ProductionManager:
     """Manages production execution with batch job orchestration."""
     
     def __init__(self, production_config_path: Path, machine: str = "nersc", 
-                 work_dir: Optional[Path] = None):
+                 work_dir: Optional[Path] = None, dry_run: bool = False):
         """Initialize production manager.
         
         Args:
             production_config_path: Path to production configuration file
             machine: Machine name for defaults
             work_dir: Working directory for production files (default: auto-generated)
+            dry_run: If True, create scripts and directories but don't submit to SLURM
         """
         self.config_path = Path(production_config_path)
         self.machine = machine
@@ -219,7 +259,7 @@ class ProductionManager:
             production_name = self.config["production"]["name"]
             production_version = self.config["production"]["version"]
             base_path = Path(self.config["outputs"]["base_path"])
-            work_dir = base_path / f"{production_version}_{production_name}"
+            work_dir = base_path / "productions" / f"{production_version}_{production_name}"
         
         self.work_dir = Path(work_dir)
         self.work_dir.mkdir(parents=True, exist_ok=True)
@@ -302,18 +342,90 @@ class ProductionManager:
         
         return jobs_created
     
-    def submit_pending_jobs(self) -> List[str]:
-        """Submit pending jobs in batches to SLURM.
+    def submit_staged_jobs(self) -> List[str]:
+        """Submit staged jobs to SLURM.
         
         Returns:
             List of submitted batch IDs
+        """
+        staged_jobs = self.job_db.get_jobs_by_status(JobStatus.STAGED)
+        if not staged_jobs:
+            return []
+        
+        # Get existing staged batches from database
+        staged_batches = self.job_db.get_batches_by_status(JobStatus.STAGED)
+        submitted_batches = []
+        
+        for batch in staged_batches:
+            batch_jobs = [job for job in staged_jobs if job.job_id in batch.job_ids]
+            if not batch_jobs:
+                continue
+                
+            # Submit existing SLURM script
+            try:
+                script_path = self.logs_dir / f"{batch.batch_id}.sh"
+                if not script_path.exists():
+                    raise FileNotFoundError(f"Batch script not found: {script_path}")
+                
+                slurm_job_id = self._submit_slurm_batch_script(script_path)
+                
+                # Update batch status
+                batch.slurm_array_id = slurm_job_id
+                batch.status = JobStatus.QUEUED
+                batch.submitted_at = datetime.utcnow().isoformat()
+                self.job_db.update_batch_status(batch.batch_id, JobStatus.QUEUED, slurm_job_id)
+                
+                # Update job statuses
+                for job in batch_jobs:
+                    self.job_db.update_job_status(
+                        job.job_id, 
+                        JobStatus.QUEUED,
+                        submit_count=job.submit_count + 1
+                    )
+                
+                submitted_batches.append(batch.batch_id)
+                print(f"Submitted batch {batch.batch_id} as SLURM job {slurm_job_id}")
+                
+            except Exception as e:
+                # Mark batch as failed
+                batch.status = JobStatus.FAILED
+                self.job_db.update_batch_status(batch.batch_id, JobStatus.FAILED)
+                for job in batch_jobs:
+                    self.job_db.update_job_status(
+                        job.job_id,
+                        JobStatus.FAILED,
+                        error_message=str(e)
+                    )
+                print(f"Failed to submit batch {batch.batch_id}: {e}")
+        
+        return submitted_batches
+    
+    def submit_pending_jobs(self) -> List[str]:
+        """Legacy method: Submit pending jobs in batches to SLURM.
+        
+        This method stages jobs and submits them in one operation.
+        For better control, use stage_jobs() followed by submit_staged_jobs().
+        
+        Returns:
+            List of submitted batch IDs
+        """
+        staged_batches = self.stage_jobs()
+        if not staged_batches:
+            return []
+        return self.submit_staged_jobs()
+    
+    def stage_jobs(self) -> List[str]:
+        """Stage pending jobs by creating SLURM scripts and directories.
+        
+        Returns:
+            List of staged batch IDs
         """
         pending_jobs = self.job_db.get_jobs_by_status(JobStatus.PENDING)
         if not pending_jobs:
             return []
         
         batch_size = self.config["execution"]["batch_size"]
-        submitted_batches = []
+        staged_batches = []
         
         # Group jobs into batches
         for i in range(0, len(pending_jobs), batch_size):
@@ -326,22 +438,24 @@ class ProductionManager:
                 job_ids=[job.job_id for job in batch_jobs]
             )
             
-            # Submit SLURM array job
+            # Create SLURM script (but don't submit)
             try:
-                slurm_job_id = self._submit_slurm_batch(batch, batch_jobs)
-                batch.slurm_array_id = slurm_job_id
-                batch.status = JobStatus.QUEUED
-                batch.submitted_at = datetime.utcnow().isoformat()
+                script_path = self._create_slurm_batch_script(batch, batch_jobs)
+                batch.status = JobStatus.STAGED
+                batch.created_at = datetime.utcnow().isoformat()
                 
-                # Update job statuses
+                # Update job statuses to STAGED
                 for job in batch_jobs:
                     self.job_db.update_job_status(
                         job.job_id, 
-                        JobStatus.QUEUED,
-                        submit_count=job.submit_count + 1
+                        JobStatus.STAGED
                     )
                 
-                submitted_batches.append(batch_id)
+                # Save batch to database
+                self.job_db.insert_batch(batch)
+                staged_batches.append(batch_id)
+                
+                print(f"Staged batch {batch_id} with {len(batch_jobs)} jobs")
                 
             except Exception as e:
                 # Mark batch as failed
@@ -352,37 +466,71 @@ class ProductionManager:
                         JobStatus.FAILED,
                         error_message=str(e)
                     )
-            
-            self.job_db.insert_batch(batch)
+                print(f"Failed to stage batch {batch_id}: {e}")
         
-        return submitted_batches
+        return staged_batches
     
-    def _submit_slurm_batch(self, batch: BatchSpec, jobs: List[JobSpec]) -> int:
-        """Submit a batch of jobs as SLURM array job.
+    def _create_slurm_batch_script(self, batch: BatchSpec, jobs: List[JobSpec]) -> Path:
+        """Create SLURM batch script for a set of jobs.
         
         Args:
             batch: Batch specification
             jobs: List of jobs in the batch
             
         Returns:
-            SLURM job ID
+            Path to created script file
         """
-        # Create job script
         script_path = self.logs_dir / f"{batch.batch_id}.sh"
         
         resources = self.config["resources"]
         execution = self.config["execution"]
         
-        script_content = f"""#!/bin/bash
+        # Generate simple script for single jobs, job array for multiple jobs
+        if len(jobs) == 1:
+            job = jobs[0]
+            script_content = f"""#!/bin/bash
 #SBATCH --job-name={batch.batch_id}
 #SBATCH --account={resources["account"]}
-#SBATCH --partition={resources["partition"]}
+#SBATCH --qos=regular
 #SBATCH --constraint={resources["constraint"]}
 #SBATCH --nodes={resources["nodes_per_job"]}
 #SBATCH --ntasks-per-node={resources["tasks_per_node"]}
 #SBATCH --cpus-per-task={resources["cpus_per_task"]}
-#SBATCH --mem={resources["memory_gb"]}GB
-#SBATCH --time={execution["timeout_hours"]:02.0f}:00:00
+#SBATCH --gpus-per-node={resources["gpus_per_node"]}
+#SBATCH --exclusive
+#SBATCH --time={int(execution["timeout_hours"] * 60):02d}:00
+#SBATCH --output={self.logs_dir}/{batch.batch_id}.out
+#SBATCH --error={self.logs_dir}/{batch.batch_id}.err
+
+# Load environment
+source {Path(__file__).parent.parent.parent / "scripts" / "load_env.sh"}
+
+echo "Starting job {job.job_id}: realization {job.realization}, redshift {job.redshift}"
+
+# Run the mock generation with MPI
+srun -n 8 python {Path(__file__).parent.parent.parent / "scripts" / "generate_single_mock.py"} \\
+    {self.machine} \\
+    "{job.output_path}" \\
+    --realization "{job.realization}" \\
+    --redshift "{job.redshift}"
+
+EXIT_CODE=$?
+
+echo "Job {job.job_id} completed with exit code $EXIT_CODE"
+exit $EXIT_CODE
+"""
+        else:
+            script_content = f"""#!/bin/bash
+#SBATCH --job-name={batch.batch_id}
+#SBATCH --account={resources["account"]}
+#SBATCH --qos=regular
+#SBATCH --constraint={resources["constraint"]}
+#SBATCH --nodes={resources["nodes_per_job"]}
+#SBATCH --ntasks-per-node={resources["tasks_per_node"]}
+#SBATCH --cpus-per-task={resources["cpus_per_task"]}
+#SBATCH --gpus-per-node={resources["gpus_per_node"]}
+#SBATCH --exclusive
+#SBATCH --time={int(execution["timeout_hours"] * 60):02d}:00
 #SBATCH --array=0-{len(jobs)-1}
 #SBATCH --output={self.logs_dir}/{batch.batch_id}_%a.out
 #SBATCH --error={self.logs_dir}/{batch.batch_id}_%a.err
@@ -393,35 +541,35 @@ source {Path(__file__).parent.parent.parent / "scripts" / "load_env.sh"}
 # Job array mapping
 declare -a JOB_IDS=(
 """
-        
-        for job in jobs:
-            script_content += f'    "{job.job_id}"\n'
-        
-        script_content += f""")
+            
+            for job in jobs:
+                script_content += f'    "{job.job_id}"\n'
+            
+            script_content += f""")
 
 declare -a REALIZATIONS=(
 """
-        
-        for job in jobs:
-            script_content += f'    "{job.realization}"\n'
-        
-        script_content += f""")
+            
+            for job in jobs:
+                script_content += f'    "{job.realization}"\n'
+            
+            script_content += f""")
 
 declare -a REDSHIFTS=(
 """
-        
-        for job in jobs:
-            script_content += f'    "{job.redshift}"\n'
-        
-        script_content += f""")
+            
+            for job in jobs:
+                script_content += f'    "{job.redshift}"\n'
+            
+            script_content += f""")
 
 declare -a OUTPUT_PATHS=(
 """
-        
-        for job in jobs:
-            script_content += f'    "{job.output_path}"\n'
-        
-        script_content += f""")
+            
+            for job in jobs:
+                script_content += f'    "{job.output_path}"\n'
+            
+            script_content += f""")
 
 # Get job parameters for this array task
 JOB_ID="${{JOB_IDS[$SLURM_ARRAY_TASK_ID]}}"
@@ -447,6 +595,20 @@ exit $EXIT_CODE
         with open(script_path, 'w') as f:
             f.write(script_content)
         
+        # Make script executable
+        script_path.chmod(0o755)
+        
+        return script_path
+    
+    def _submit_slurm_batch_script(self, script_path: Path) -> int:
+        """Submit an existing SLURM batch script.
+        
+        Args:
+            script_path: Path to the batch script to submit
+            
+        Returns:
+            SLURM job ID
+        """
         # Submit to SLURM
         result = subprocess.run(
             ["sbatch", str(script_path)],
@@ -463,12 +625,35 @@ exit $EXIT_CODE
         
         raise RuntimeError(f"Could not parse SLURM job ID from: {result.stdout}")
     
+    def _submit_slurm_batch(self, batch: BatchSpec, jobs: List[JobSpec]) -> int:
+        """Submit a batch of jobs as SLURM array job (legacy method).
+        
+        Args:
+            batch: Batch specification
+            jobs: List of jobs in the batch
+            
+        Returns:
+            SLURM job ID
+        """
+        script_path = self._create_slurm_batch_script(batch, jobs)
+        return self._submit_slurm_batch_script(script_path)
+    
     def check_job_status(self) -> Dict[str, int]:
         """Check status of all jobs and update database.
         
         Returns:
             Updated production statistics
         """
+        # First, ensure we have jobs in the database
+        stats = self.job_db.get_production_stats()
+        total_jobs = sum(stats.values())
+        
+        if total_jobs == 0:
+            # Database is empty, need to reinitialize
+            print("Warning: No jobs found in database, reinitializing...")
+            self.initialize_production()
+            stats = self.job_db.get_production_stats()
+        
         # Query SLURM for running jobs
         try:
             result = subprocess.run(
@@ -487,11 +672,24 @@ exit $EXIT_CODE
         except (subprocess.CalledProcessError, ValueError):
             slurm_jobs = {}
         
-        # Update job statuses based on SLURM state
-        queued_jobs = self.job_db.get_jobs_by_status(JobStatus.QUEUED)
-        running_jobs = self.job_db.get_jobs_by_status(JobStatus.RUNNING)
+        # Check all jobs in database for completion based on output files
+        all_jobs = []
+        for status in [JobStatus.PENDING, JobStatus.STAGED, JobStatus.QUEUED, JobStatus.RUNNING]:
+            all_jobs.extend(self.job_db.get_jobs_by_status(status))
         
-        for job in queued_jobs + running_jobs:
+        for job in all_jobs:
+            # Check if output file exists
+            if Path(job.output_path).exists():
+                # Job completed - update status
+                if job.status != JobStatus.COMPLETED:
+                    self.job_db.update_job_status(
+                        job.job_id,
+                        JobStatus.COMPLETED,
+                        completed_at=datetime.utcnow().isoformat()
+                    )
+                continue
+            
+            # No output file - check SLURM status if we have job ID
             if job.slurm_job_id and job.slurm_job_id in slurm_jobs:
                 slurm_status = slurm_jobs[job.slurm_job_id]
                 
@@ -502,35 +700,15 @@ exit $EXIT_CODE
                             JobStatus.RUNNING,
                             started_at=datetime.utcnow().isoformat()
                         )
-                elif slurm_status in ["COMPLETED", "CD"]:
-                    # Check if output file exists to confirm completion
-                    if Path(job.output_path).exists():
-                        self.job_db.update_job_status(
-                            job.job_id,
-                            JobStatus.COMPLETED,
-                            completed_at=datetime.utcnow().isoformat()
-                        )
-                    else:
-                        self.job_db.update_job_status(
-                            job.job_id,
-                            JobStatus.FAILED,
-                            error_message="Output file not found after SLURM completion"
-                        )
                 elif slurm_status in ["FAILED", "F", "TIMEOUT", "TO", "CANCELLED", "CA"]:
                     self.job_db.update_job_status(
                         job.job_id,
                         JobStatus.FAILED,
                         error_message=f"SLURM status: {slurm_status}"
                     )
-            elif job.slurm_job_id:
-                # Job not in SLURM queue anymore, check output
-                if Path(job.output_path).exists():
-                    self.job_db.update_job_status(
-                        job.job_id,
-                        JobStatus.COMPLETED,
-                        completed_at=datetime.utcnow().isoformat()
-                    )
-                else:
+            elif job.slurm_job_id and job.slurm_job_id not in slurm_jobs:
+                # Job not in SLURM queue anymore and no output file - failed
+                if job.status in [JobStatus.QUEUED, JobStatus.RUNNING]:
                     self.job_db.update_job_status(
                         job.job_id,
                         JobStatus.FAILED,

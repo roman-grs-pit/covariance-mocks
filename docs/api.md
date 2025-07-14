@@ -62,22 +62,22 @@ comm, rank, size, MPI_AVAILABLE = initialize_mpi_jax()
 finalize_mpi(comm, rank, size, MPI_AVAILABLE)
 ```
 
-### Campaign Management
+### Production Management
 ```python
 from covariance_mocks.production_config import ProductionConfig
 from covariance_mocks.production_manager import ProductionManager
 
-# Load and validate campaign configuration
-config = CampaignConfig.from_yaml('config/examples/production_campaign.yaml')
+# Load and validate production configuration
+config = ProductionConfig.from_yaml('config/examples/production_template.yaml')
 
-# Initialize campaign manager
-manager = CampaignManager(config)
+# Initialize production manager
+manager = ProductionManager(config)
 
-# Submit campaign jobs
-manager.submit_campaign()
+# Submit production jobs
+manager.submit_production()
 
-# Monitor campaign status
-status = manager.get_campaign_status()
+# Monitor production status
+status = manager.get_production_status()
 ```
 
 **📖 For complete documentation with detailed parameters, examples, and usage patterns, visit [Read the Docs](https://grs-pit-covariance-mocks.readthedocs.io/en/latest/api.html).**

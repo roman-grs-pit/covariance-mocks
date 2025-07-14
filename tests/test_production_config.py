@@ -88,9 +88,9 @@ class TestProductionConfigValidator:
         """Test that valid configuration passes validation."""
         config = {
             "production": {
-                "name": "test_campaign",
+                "name": "test_production",
                 "version": "v1.0",
-                "description": "Test campaign for validation testing"
+                "description": "Test production for validation testing"
             },
             "science": {
                 "cosmology": "AbacusSummit",
@@ -105,7 +105,7 @@ class TestProductionConfigValidator:
                 "batch_size": 5
             },
             "outputs": {
-                "base_path": "/tmp/test_campaign"
+                "base_path": "/tmp/test_production"
             }
         }
         
@@ -116,7 +116,7 @@ class TestProductionConfigValidator:
         """Test that missing required section fails validation."""
         config = {
             "production": {
-                "name": "test_campaign",
+                "name": "test_production",
                 "version": "v1.0"
             }
             # Missing required 'science' section
@@ -146,7 +146,7 @@ class TestProductionConfigValidator:
         """Test that invalid types fail validation."""
         config = {
             "production": {
-                "name": "test_campaign",
+                "name": "test_production",
                 "version": "v1.0"
             },
             "science": {
@@ -167,7 +167,7 @@ class TestProductionConfigLoader:
         # Create test production config
         production_config = {
             "production": {
-                "name": "test_campaign",
+                "name": "test_production",
                 "version": "v1.0"
             },
             "science": {
@@ -178,7 +178,7 @@ class TestProductionConfigLoader:
             }
         }
         
-        config_path = test_config_dir / "test_campaign.yaml"
+        config_path = test_config_dir / "test_production.yaml"
         with open(config_path, 'w') as f:
             yaml.dump(production_config, f)
         
@@ -189,18 +189,18 @@ class TestProductionConfigLoader:
         assert merged_config["resources"]["account"] == "test_account"
         assert merged_config["execution"]["job_type"] == "balanced"
         
-        # Check that campaign overrides were applied
+        # Check that production overrides were applied
         assert merged_config["execution"]["batch_size"] == 20
         
-        # Check that campaign-specific values are preserved
-        assert merged_config["production"]["name"] == "test_campaign"
+        # Check that production-specific values are preserved
+        assert merged_config["production"]["name"] == "test_production"
         assert merged_config["science"]["redshifts"] == [1.0, 2.0]
     
     def test_missing_machine_defaults_fails(self, config_loader, test_config_dir):
         """Test that missing machine defaults fails."""
         production_config = {
             "production": {
-                "name": "test_campaign",
+                "name": "test_production",
                 "version": "v1.0"
             },
             "science": {
@@ -208,7 +208,7 @@ class TestProductionConfigLoader:
             }
         }
         
-        config_path = test_config_dir / "test_campaign.yaml"
+        config_path = test_config_dir / "test_production.yaml"
         with open(config_path, 'w') as f:
             yaml.dump(production_config, f)
         
@@ -227,7 +227,7 @@ class TestProductionConfigLoader:
             }
         }
         
-        config_path = test_config_dir / "test_campaign.yaml"
+        config_path = test_config_dir / "test_production.yaml"
         with open(config_path, 'w') as f:
             yaml.dump(production_config, f)
         

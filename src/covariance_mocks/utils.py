@@ -7,7 +7,7 @@ Common utility functions for the covariance mocks pipeline.
 import os
 
 # AbacusSummit data configuration
-ABACUS_BASE_PATH = "/global/cfs/cdirs/desi/public/cosmosim/AbacusSummit"
+ABACUS_BASE_PATH = "/global/cfs/cdirs/desi/public/cosmosim/AbacusSummit/small"
 SIMULATION_SUITE = "small"
 
 

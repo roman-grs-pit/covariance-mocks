@@ -23,7 +23,7 @@ def initialize_production(args):
     try:
         manager = ProductionManager(args.config, args.machine, args.work_dir)
         
-        print(f"Initializing campaign from {args.config}")
+        print(f"Initializing production from {args.config}")
         print(f"Machine: {args.machine}")
         print(f"Work directory: {manager.work_dir}")
         
@@ -44,29 +44,62 @@ def initialize_production(args):
         print(f"Configuration error: {e}", file=sys.stderr)
         return 1
     except Exception as e:
-        print(f"Error initializing campaign: {e}", file=sys.stderr)
+        print(f"Error initializing production: {e}", file=sys.stderr)
+        return 1
+
+
+def stage_jobs(args):
+    """Stage pending jobs by creating SLURM scripts."""
+    try:
+        manager = ProductionManager(args.config, args.machine, args.work_dir)
+        
+        print(f"Staging pending jobs for production in {manager.work_dir}")
+        
+        staged_batches = manager.stage_jobs()
+        
+        if staged_batches:
+            print(f"Staged {len(staged_batches)} batches:")
+            for batch_id in staged_batches:
+                print(f"  - {batch_id}")
+            print(f"\nGenerated SLURM scripts in: {manager.logs_dir}")
+            print("Review scripts before submitting with: python run_production.py submit")
+        else:
+            print("No pending jobs to stage")
+        
+        # Show updated statistics
+        stats = manager.check_job_status()
+        print(f"\nProduction Status:")
+        for status, count in stats.items():
+            if count > 0:
+                print(f"  {status}: {count}")
+        
+        return 0
+        
+    except Exception as e:
+        print(f"Error staging jobs: {e}", file=sys.stderr)
         return 1
 
 
 def submit_jobs(args):
-    """Submit pending jobs to SLURM."""
+    """Submit staged jobs to SLURM."""
     try:
         manager = ProductionManager(args.config, args.machine, args.work_dir)
         
-        print(f"Submitting pending jobs for campaign in {manager.work_dir}")
+        print(f"Submitting staged jobs for production in {manager.work_dir}")
         
-        submitted_batches = manager.submit_pending_jobs()
+        submitted_batches = manager.submit_staged_jobs()
         
         if submitted_batches:
             print(f"Submitted {len(submitted_batches)} batches:")
             for batch_id in submitted_batches:
                 print(f"  - {batch_id}")
         else:
-            print("No pending jobs to submit")
+            print("No staged jobs to submit")
+            print("Stage jobs first with: python run_production.py stage")
         
         # Show updated statistics
         stats = manager.check_job_status()
-        print(f"\nCampaign Status:")
+        print(f"\nProduction Status:")
         for status, count in stats.items():
             if count > 0:
                 print(f"  {status}: {count}")
@@ -79,16 +112,17 @@ def submit_jobs(args):
 
 
 def check_status(args):
-    """Check campaign status."""
+    """Check production status."""
     try:
         manager = ProductionManager(args.config, args.machine, args.work_dir)
         
-        print(f"Checking status for campaign in {manager.work_dir}")
+        print(f"Checking status for production in {manager.work_dir}")
         
         stats = manager.check_job_status()
         summary = manager.get_production_summary()
         
-        print(f"\nCampaign: {summary['production']['name']} {summary['production']['version']}")
+        print(f"\nProduction: {summary['production']['name']} {summary['production']['version']}")
+        print(f"Path: {manager.work_dir}")
         print(f"Total jobs: {summary['statistics']['total_jobs']}")
         print(f"Success rate: {summary['statistics']['success_rate']:.1%}")
         
@@ -117,7 +151,7 @@ def retry_failed(args):
     try:
         manager = ProductionManager(args.config, args.machine, args.work_dir)
         
-        print(f"Retrying failed jobs for campaign in {manager.work_dir}")
+        print(f"Retrying failed jobs for production in {manager.work_dir}")
         
         retried_count = manager.retry_failed_jobs()
         
@@ -144,7 +178,7 @@ def monitor_production(args):
     try:
         manager = ProductionManager(args.config, args.machine, args.work_dir)
         
-        print(f"Monitoring campaign in {manager.work_dir}")
+        print(f"Monitoring production in {manager.work_dir}")
         print(f"Update interval: {args.interval} seconds")
         print("Press Ctrl+C to stop monitoring\n")
         
@@ -155,9 +189,10 @@ def monitor_production(args):
                 
                 # Clear screen and show status
                 print("\033[2J\033[H", end="")  # Clear screen
-                print(f"Campaign Monitor - {time.strftime('%Y-%m-%d %H:%M:%S')}")
+                print(f"Production Monitor - {time.strftime('%Y-%m-%d %H:%M:%S')}")
                 print("=" * 60)
-                print(f"Campaign: {summary['production']['name']} {summary['production']['version']}")
+                print(f"Production: {summary['production']['name']} {summary['production']['version']}")
+                print(f"Path: {manager.work_dir}")
                 print(f"Total jobs: {summary['statistics']['total_jobs']}")
                 print(f"Success rate: {summary['statistics']['success_rate']:.1%}")
                 print()
@@ -176,31 +211,34 @@ def monitor_production(args):
             return 0
         
     except Exception as e:
-        print(f"Error monitoring campaign: {e}", file=sys.stderr)
+        print(f"Error monitoring production: {e}", file=sys.stderr)
         return 1
 
 
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="Campaign management for covariance mock generation",
+        description="Production management for covariance mock generation",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Initialize a new campaign
-  python run_campaign.py init config/examples/test_campaign.yaml
+  # Initialize a new production
+  python run_production.py init config/examples/test_production.yaml
 
-  # Submit pending jobs
-  python run_campaign.py submit config/examples/test_campaign.yaml
+  # Stage pending jobs (create scripts)
+  python run_production.py stage config/examples/test_production.yaml
 
-  # Check campaign status
-  python run_campaign.py status config/examples/test_campaign.yaml --verbose
+  # Submit staged jobs to SLURM
+  python run_production.py submit config/examples/test_production.yaml
+
+  # Check production status
+  python run_production.py status config/examples/test_production.yaml --verbose
 
   # Retry failed jobs and submit immediately
-  python run_campaign.py retry config/examples/test_campaign.yaml --submit
+  python run_production.py retry config/examples/test_production.yaml --submit
 
-  # Monitor campaign progress
-  python run_campaign.py monitor config/examples/test_campaign.yaml --interval 30
+  # Monitor production progress
+  python run_production.py monitor config/examples/test_production.yaml --interval 30
         """
     )
     
@@ -219,30 +257,35 @@ Examples:
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
     
     # Initialize command
-    init_parser = subparsers.add_parser("init", help="Initialize new campaign")
-    init_parser.add_argument("config", type=Path, help="Campaign configuration file")
+    init_parser = subparsers.add_parser("init", help="Initialize new production")
+    init_parser.add_argument("config", type=Path, help="Production configuration file")
     init_parser.set_defaults(func=initialize_production)
     
+    # Stage command
+    stage_parser = subparsers.add_parser("stage", help="Stage pending jobs")
+    stage_parser.add_argument("config", type=Path, help="Production configuration file")
+    stage_parser.set_defaults(func=stage_jobs)
+    
     # Submit command
-    submit_parser = subparsers.add_parser("submit", help="Submit pending jobs")
-    submit_parser.add_argument("config", type=Path, help="Campaign configuration file")
+    submit_parser = subparsers.add_parser("submit", help="Submit staged jobs")
+    submit_parser.add_argument("config", type=Path, help="Production configuration file")
     submit_parser.set_defaults(func=submit_jobs)
     
     # Status command
-    status_parser = subparsers.add_parser("status", help="Check campaign status")
-    status_parser.add_argument("config", type=Path, help="Campaign configuration file")
+    status_parser = subparsers.add_parser("status", help="Check production status")
+    status_parser.add_argument("config", type=Path, help="Production configuration file")
     status_parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed information")
     status_parser.set_defaults(func=check_status)
     
     # Retry command
     retry_parser = subparsers.add_parser("retry", help="Retry failed jobs")
-    retry_parser.add_argument("config", type=Path, help="Campaign configuration file")
+    retry_parser.add_argument("config", type=Path, help="Production configuration file")
     retry_parser.add_argument("--submit", action="store_true", help="Submit retry jobs immediately")
     retry_parser.set_defaults(func=retry_failed)
     
     # Monitor command
-    monitor_parser = subparsers.add_parser("monitor", help="Monitor campaign progress")
-    monitor_parser.add_argument("config", type=Path, help="Campaign configuration file")
+    monitor_parser = subparsers.add_parser("monitor", help="Monitor production progress")
+    monitor_parser.add_argument("config", type=Path, help="Production configuration file")
     monitor_parser.add_argument("--interval", type=int, default=60, help="Update interval in seconds (default: 60)")
     monitor_parser.set_defaults(func=monitor_production)
     

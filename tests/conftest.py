@@ -56,7 +56,7 @@ def mock_environment(monkeypatch):
 def shared_catalog():
     """Generate a single production catalog once per session for all tests."""
     # Use shared filesystem location for MPI-HDF5 compatibility  
-    base_dir = Path("/global/cfs/cdirs/m4943/Simulations/covariance_mocks/data/tmp")
+    base_dir = Path("/global/cfs/cdirs/m4943/Simulations/covariance_mocks/validation/tmp")
     base_dir.mkdir(parents=True, exist_ok=True)
     
     # Create session-specific directory

@@ -18,12 +18,12 @@ from covariance_mocks.production_manager import (
 
 @pytest.fixture
 def test_production_config():
-    """Create test campaign configuration."""
+    """Create test production configuration."""
     return {
         "production": {
-            "name": "test_campaign",
+            "name": "test_production",
             "version": "v1.0",
-            "description": "Test campaign for unit testing"
+            "description": "Test production for unit testing"
         },
         "science": {
             "cosmology": "AbacusSummit",
@@ -54,7 +54,7 @@ def test_production_config():
             "memory_gb": 8.0
         },
         "outputs": {
-            "base_path": "/tmp/test_campaigns",
+            "base_path": "/tmp/test_productions",
             "structure": "hierarchical",
             "compression": "gzip"
         }
@@ -142,8 +142,8 @@ class TestJobDatabase:
         assert len(running_jobs) == 1
         assert running_jobs[0].slurm_job_id == 12345
     
-    def test_campaign_stats(self, temp_work_dir):
-        """Test campaign statistics calculation."""
+    def test_production_stats(self, temp_work_dir):
+        """Test production statistics calculation."""
         db_path = temp_work_dir / "test.db"
         db = JobDatabase(db_path)
         
@@ -167,11 +167,11 @@ class TestJobDatabase:
 
 
 class TestProductionManager:
-    """Test campaign manager functionality."""
+    """Test production manager functionality."""
     
     @patch('covariance_mocks.production_manager.ProductionConfigLoader')
     def test_manager_initialization(self, mock_loader, temp_config_file, temp_work_dir, test_production_config):
-        """Test campaign manager initialization."""
+        """Test production manager initialization."""
         # Mock config loader
         mock_loader_instance = MagicMock()
         mock_loader_instance.load_production_config.return_value = test_production_config
@@ -197,13 +197,13 @@ class TestProductionManager:
     
     @patch('covariance_mocks.production_manager.ProductionConfigLoader')
     def test_production_initialization(self, mock_loader, temp_config_file, temp_work_dir, test_production_config):
-        """Test campaign job creation."""
+        """Test production job creation."""
         # Mock config loader
         mock_loader_instance = MagicMock()
         mock_loader_instance.load_production_config.return_value = test_production_config
         mock_loader.return_value = mock_loader_instance
         
-        # Create manager and initialize campaign
+        # Create manager and initialize production
         manager = ProductionManager(temp_config_file, "test_machine", temp_work_dir)
         jobs_created = manager.initialize_production()
         
@@ -291,7 +291,7 @@ class TestProductionManager:
     
     @patch('covariance_mocks.production_manager.ProductionConfigLoader')
     def test_production_summary(self, mock_loader, temp_config_file, temp_work_dir, test_production_config):
-        """Test campaign summary generation."""
+        """Test production summary generation."""
         # Mock config loader
         mock_loader_instance = MagicMock()
         mock_loader_instance.load_production_config.return_value = test_production_config

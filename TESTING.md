@@ -1,12 +1,13 @@
 # Testing Guide
 
-This document provides a reference for the testing procedures in the covariance-mocks project.
+This document provides a reference for the testing procedures in the covariance-mocks project, including production management testing.
 
 ## Prerequisites
 
-Load the environment first (provides pytest and all dependencies):
+Load the environment and install CLI tools (provides pytest and all dependencies):
 ```bash
 source scripts/load_env.sh
+pip install -e .  # Installs production-manager CLI
 ```
 
 ## Quick Development Testing (< 5 minutes)
@@ -73,7 +74,23 @@ python scripts/run_validation.py generate /tmp/validation_test
 python scripts/run_validation.py info  # Show reference catalog details
 ```
 
-### 4. Shell Script Compatibility Tests
+### 4. Production Management Tests
+Test the CLI system and production workflows:
+```bash
+# Test CLI installation and registry
+production-manager list
+
+# Test production initialization (dry run)
+production-manager init test_basic
+production-manager status test_basic
+
+# Test production workflow with small scale
+production-manager stage test_basic
+production-manager submit test_basic
+production-manager monitor test_basic
+```
+
+### 5. Shell Script Compatibility Tests
 Verify shell script uses same underlying logic:
 ```bash
 # Test updated shell script interface
@@ -90,6 +107,31 @@ python tests/integration_core.py /tmp/direct_test --test
 - **`@pytest.mark.slow`**: Long-running tests (production mode) 
 - **`@pytest.mark.validation`**: Tests comparing against reference catalogs
 
+## Production Management Testing
+
+The CLI system includes specific tests for production workflows:
+
+### CLI Testing
+```bash
+# Test CLI installation and registry
+production-manager list
+production-manager status --help
+
+# Test name resolution
+production-manager status v1.0_alpha
+production-manager status alpha  # Backwards compatibility
+```
+
+### Production Workflow Testing
+```bash
+# Test complete workflow with test production
+production-manager init test_basic     # Should create 120 jobs (10 realizations × 12 redshifts)
+production-manager stage test_basic    # Should create batch scripts
+production-manager status test_basic   # Should show staged jobs
+production-manager submit test_basic   # Should submit to SLURM
+production-manager monitor test_basic  # Should show live updates
+```
+
 ## Common Testing Commands
 
 ### Development Workflow (Fast)
@@ -102,6 +144,10 @@ pytest -m "unit or (system and not slow)" -v
 
 # Save fast test output to log file
 pytest -m "unit or (system and not slow)" -v 2>&1 | tee dev_tests.log
+
+# Test CLI functionality
+production-manager list
+production-manager status test_basic
 ```
 
 ### Validation Workflow (Long - Run in Background)
@@ -121,6 +167,7 @@ nohup pytest -v --timeout=1800 > full_tests.log 2>&1 &
 ### Daily Development
 - **During development**: `pytest -m unit -v` (< 1 minute)
 - **Pre-commit**: `pytest -m "unit or (system and not slow)" -v` (< 5 minutes)
+- **CLI testing**: `production-manager list && production-manager status test_basic` (< 30 seconds)
 
 ### Validation Testing
 - **Before releases**: Run validation tests in background
@@ -144,7 +191,7 @@ pkill -f "pytest.*slow"
 
 ## Validation Reference
 
-**Reference catalog**: `/global/cfs/cdirs/m4943/Simulations/covariance_mocks/data/validated/mock_AbacusSummit_small_c000_ph3000_z1.100.hdf5`
+**Reference catalog**: `/global/cfs/cdirs/m4943/Simulations/covariance_mocks/validation/validated/mock_AbacusSummit_small_c000_ph3000_z1.100.hdf5`
 
 Validation checks:
 - **Dataset structure**: Same dataset names, shapes, and dtypes
@@ -154,19 +201,28 @@ Validation checks:
 
 ## Files and Architecture
 
+### Testing Architecture
+The testing system uses a **shared core logic approach** enabling both pytest and shell script workflows:
+
 ### Core Testing Infrastructure
 - **`tests/integration_core.py`**: Shared SLURM execution logic used by both pytest and shell scripts
-- **`tests/conftest.py`**: Pytest configuration and fixtures
-- **`pyproject.toml`**: Test configuration with markers
+- **`tests/conftest.py`**: Pytest configuration and fixtures with validation path updates
+- **`pyproject.toml`**: Test configuration with markers for unit/system/validation tests
 
 ### Test Files
-- **`tests/test_integration_core.py`**: Unit tests for core functions
+- **`tests/test_integration_core.py`**: Unit tests for core functions (fast, mocked SLURM)
 - **`tests/test_system_integration.py`**: System tests for full SLURM integration
-- **`tests/test_catalog_validation.py`**: Validation tests against reference data
+- **`tests/test_catalog_validation.py`**: Validation tests against reference data using `/validation/` paths
 
 ### Tools and Scripts
 - **`scripts/run_validation.py`**: Standalone catalog validation tool
 - **`scripts/make_mocks.sh`**: Updated shell script using Python shared core logic
+
+### Validation Infrastructure Updates
+- **Path migration**: Updated from `/data/` to `/validation/` directory structure
+- **Reference catalog**: Now located at `/validation/validated/` for improved organization
+- **HDF5 dataset comparison**: Exact equality for integers, tolerance-based for floating point
+- **Reproducibility testing**: Multiple runs produce identical results
 
 ## Troubleshooting
 

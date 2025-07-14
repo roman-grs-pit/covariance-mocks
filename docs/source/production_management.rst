@@ -32,6 +32,38 @@ Key Features
 **Production-Centric Organization**
   Structured output directories with metadata, logs, and quality assurance
 
+**Three-Stage Workflow**
+  Init → Stage → Submit architecture with script inspection capability
+
+Three-Stage Workflow
+---------------------
+
+The production system implements a three-stage workflow for better control and transparency:
+
+**Stage 1: INIT**
+  - Creates production directory structure under ``/productions/{version}_{name}/``
+  - Validates configuration against schema
+  - Initializes SQLite job tracking database
+  - Sets up organized subdirectories (catalogs/, logs/, metadata/, qa/)
+
+**Stage 2: STAGE** 
+  - Generates SLURM job scripts for inspection
+  - Creates batch scripts optimized for job arrays
+  - Allows review of resource allocation and job parameters
+  - Scripts saved to ``logs/`` directory for transparency
+
+**Stage 3: SUBMIT**
+  - Submits pre-generated SLURM scripts to scheduler
+  - Updates job tracking database with SLURM job IDs
+  - Begins execution monitoring and progress tracking
+  - Enables retry and failure recovery mechanisms
+
+**Benefits:**
+  - **Transparency**: Review generated scripts before execution
+  - **Safety**: Validate configuration and resource requirements first
+  - **Control**: Separate script generation from job submission
+  - **Organization**: Clean directory structure without redundant naming
+
 Configuration System
 --------------------
 
@@ -109,36 +141,85 @@ Machine-specific defaults are loaded automatically based on the target system:
 Usage Examples
 --------------
 
-Creating a Test Production
-~~~~~~~~~~~~~~~~~~~~~~~~~
+CLI Installation and Setup
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The production system provides a command-line interface for easy management:
 
 .. code-block:: bash
 
-   # Initialize test production
-   python scripts/run_production.py init config/examples/test_production.yaml
+   # One-time setup: Install CLI tool
+   source scripts/load_env.sh
+   pip install -e .
 
-   # Submit jobs to SLURM
-   python scripts/run_production.py submit config/examples/test_production.yaml
+   # List available productions
+   production-manager list
 
-   # Monitor progress
-   python scripts/run_production.py status config/examples/test_production.yaml --verbose
+Creating a Test Production
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The production system uses a **three-stage workflow** with name-based lookup:
+
+.. code-block:: bash
+
+   # Stage 1: Initialize test production using name
+   production-manager init test_basic
+
+   # Stage 2: Generate and inspect SLURM scripts (optional)
+   production-manager stage test_basic
+
+   # Stage 3: Submit jobs to SLURM
+   production-manager submit test_basic
+
+   # Monitor progress with live updates
+   production-manager monitor test_basic
+
+   # Quick status check
+   production-manager status test_basic --verbose
 
 Production Workflow
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
-   # 1. Initialize production 
-   python scripts/run_production.py init config/examples/production.yaml
+   # 1. Initialize production using name-based lookup
+   production-manager init v1.0_covariance_v1
 
-   # 2. Submit initial batch of jobs
-   python scripts/run_production.py submit config/examples/production.yaml
+   # 2. Generate SLURM scripts for inspection (optional)
+   production-manager stage v1.0_covariance_v1
 
-   # 3. Monitor production in real-time
-   python scripts/run_production.py monitor config/examples/production.yaml --interval 60
+   # 3. Submit jobs to SLURM
+   production-manager submit v1.0_covariance_v1
 
-   # 4. Handle failures (in separate terminal)
-   python scripts/run_production.py retry config/examples/production.yaml --submit
+   # 4. Monitor production in real-time with path display
+   production-manager monitor v1.0_covariance_v1
+
+   # 5. Handle failures (in separate terminal)
+   production-manager retry v1.0_covariance_v1
+
+CLI Features
+~~~~~~~~~~~~
+
+**Name-based Production Management:**
+  Use production identifiers like ``v1.0_alpha`` instead of config file paths
+
+**Registry System:**
+  Automatic mapping of production names to configuration files in ``config/examples/``
+
+**Live Monitoring:**
+  Real-time status updates with production path display for easy log access
+
+**Production Identifiers:**
+  Uses ``{version}_{name}`` pattern matching directory structure (e.g., ``v1.0_alpha``)
+
+.. code-block:: bash
+
+   # Available productions shown with mappings
+   production-manager list
+   # Output:
+   # alpha                -> config/examples/alpha_production.yaml
+   # v1.0_alpha           -> config/examples/alpha_production.yaml
+   # v1.0_covariance_v1   -> config/examples/production.yaml
 
 Production Management API
 ------------------------
@@ -185,10 +266,12 @@ Productions create a structured output directory hierarchy:
    │   └── ...
    ├── metadata/           # Production configuration and tracking
    │   ├── production_config.yaml
-   │   └── production.db
-   ├── logs/               # SLURM job logs
-   │   ├── batch_0000_*.out
-   │   ├── batch_0000_*.err
+   │   ├── production.db
+   │   └── version_info.json
+   ├── logs/               # SLURM job logs and scripts
+   │   ├── batch_0000.sh   # Generated SLURM scripts
+   │   ├── batch_0000.out  # Job output logs
+   │   ├── batch_0000.err  # Job error logs
    │   └── ...
    └── qa/                 # Quality assurance outputs
        ├── validation_reports/

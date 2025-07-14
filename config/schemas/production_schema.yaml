@@ -7,8 +7,8 @@ production:
   properties:
     name:
       type: string
-      pattern: "^[a-zA-Z][a-zA-Z0-9_-]*$"
-      description: "Production identifier (alphanumeric, underscore, hyphen)"
+      pattern: "^[a-zA-Z][a-zA-Z0-9._-]*$"
+      description: "Production identifier (alphanumeric, dot, underscore, hyphen)"
     version:
       type: string
       pattern: "^v\\d+\\.\\d+(?:\\.\\d+)?(?:-[a-zA-Z0-9_-]+)?$"

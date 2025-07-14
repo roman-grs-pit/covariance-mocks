@@ -10,13 +10,22 @@ Modular pipeline for generating mock galaxy catalogs from AbacusSummit halo cata
 
 The pipeline uses a **modular architecture** with core functionality organized in `src/covariance_mocks/`:
 
+### Core Pipeline Components
 - **`data_loader.py`** - Halo catalog loading and filtering
 - **`galaxy_generator.py`** - Galaxy population modeling via rgrspit_diffsky
 - **`hdf5_writer.py`** - Parallel HDF5 output with MPI collective I/O
 - **`mpi_setup.py`** - MPI initialization and domain decomposition
 - **`utils.py`** - Shared utilities and configuration
+
+### Production Management System
 - **`production_config.py`** - YAML configuration validation and hierarchical inheritance
-- **`production_manager.py`** - SQLite job tracking and SLURM array orchestration
+- **`production_manager.py`** - Three-stage workflow orchestration with SQLite job tracking
+- **`scripts/run_production.py`** - CLI interface for production management
+
+### Three-Stage Production Workflow
+1. **INIT**: Production initialization with configuration validation
+2. **STAGED**: SLURM script generation for inspection 
+3. **SUBMITTED**: Job submission and execution tracking
 
 ## Installation
 
@@ -26,6 +35,10 @@ The pipeline uses a **modular architecture** with core functionality organized i
 # Clone the repository
 git clone https://github.com/roman-grs-pit/covariance-mocks.git
 cd covariance-mocks
+
+# Load environment and install CLI tools
+source scripts/load_env.sh
+pip install -e .
 ```
 
 ## Quick Start on Perlmutter (NERSC)
@@ -44,24 +57,49 @@ source scripts/load_env.sh
 ./scripts/make_mocks.sh --force
 ```
 
-### Campaign Management (Large Scale)
+### Production Management (Large Scale)
+
+The production system provides a **CLI tool** with name-based production management:
 
 ```bash
 # Load environment
 source scripts/load_env.sh
 
-# Initialize a campaign
-python scripts/run_campaign.py init my_campaign config/examples/production_campaign.yaml
+# Install CLI tool (one-time setup)
+pip install -e .
 
-# Submit jobs to SLURM
-python scripts/run_campaign.py submit my_campaign
+# List available productions
+production-manager list
 
-# Monitor progress
-python scripts/run_campaign.py status my_campaign
+# Stage 1: Initialize production using name
+production-manager init v1.0_alpha
+
+# Stage 2: Generate and inspect SLURM scripts (optional)
+production-manager stage v1.0_alpha
+
+# Stage 3: Submit jobs to SLURM
+production-manager submit v1.0_alpha
+
+# Monitor progress with live updates
+production-manager monitor v1.0_alpha
+
+# Quick status check
+production-manager status v1.0_alpha
 
 # Retry failed jobs
-python scripts/run_campaign.py retry my_campaign
+production-manager retry v1.0_alpha
 ```
+
+**CLI Features:**
+- **Name-based lookup**: Use production names like `v1.0_alpha` instead of config file paths
+- **Live monitoring**: Real-time status updates with production path display
+- **Registry system**: Automatic mapping of production names to configurations
+- **Three-stage workflow**: Init → Stage → Submit with script inspection
+
+**Directory Structure:**
+- Productions organized as `/productions/{version}_{name}/` (e.g., `/productions/v1.0_alpha/`)
+- Clean naming matching production identifiers
+- Separate directories for catalogs, logs, metadata, and scripts
 
 ### Manual Pipeline Steps
 
@@ -92,6 +130,7 @@ python scripts/plot_mock_catalog.py /path/to/output/mock_catalog.hdf5
 
 ## Output Files
 
+### Single Mock Generation
 By default, output files are written to `$SCRATCH/grspit/covariance_mocks/data/`. To use a different directory, set the `GRS_COV_MOCKS_DIR` environment variable:
 
 ```bash
@@ -102,6 +141,21 @@ Output files include:
 - `mock_*.hdf5`: Galaxy catalog with positions, masses, and properties
 - `mock_*.png`: Visualization showing galaxy and halo distributions
 - `mocks.log`: Pipeline execution log
+
+### Production Output
+Productions use organized directory structure:
+
+```
+/productions/{version}_{name}/
+├── catalogs/           # Generated HDF5 catalogs
+├── logs/              # SLURM job logs and scripts
+├── metadata/          # Production configuration and tracking
+│   ├── production_config.yaml
+│   └── production.db  # SQLite job tracking database
+└── qa/                # Quality assurance outputs
+```
+
+**Example**: Alpha production (`v1.0_alpha`) creates `/productions/v1.0_alpha/` with organized structure.
 
 ### Example Output Visualization
 
