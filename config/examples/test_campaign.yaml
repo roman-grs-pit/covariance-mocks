@@ -1,0 +1,43 @@
+# Test Campaign Configuration
+# Small-scale campaign for development and testing
+
+campaign:
+  name: "test_basic"
+  version: "v1.0"
+  description: "Basic test campaign with minimal resources for development validation"
+  tags: ["test", "development", "validation"]
+
+science:
+  cosmology: "AbacusSummit"
+  redshifts: [1.0, 1.5, 2.0]
+  realizations:
+    start: 0
+    count: 10
+    step: 1
+  catalog_params:
+    magnitude_limit: 21.0
+    area_deg2: 100.0
+
+execution:
+  job_type: "balanced"
+  batch_size: 5
+  timeout_hours: 2.0
+  retry_policy:
+    max_retries: 2
+    backoff_multiplier: 1.5
+    initial_delay_minutes: 2.0
+
+# Resource overrides for testing (smaller than defaults)
+resources:
+  nodes_per_job: 1
+  tasks_per_node: 32
+  memory_gb: 64.0
+
+outputs:
+  base_path: "/tmp/test_campaigns"
+  structure: "hierarchical"
+  compression: "gzip"
+  cleanup_policy:
+    keep_logs_days: 7
+    keep_intermediate: true
+    archive_completed: false

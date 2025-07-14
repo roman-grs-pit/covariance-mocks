@@ -4,7 +4,7 @@ User Guide
 Pipeline Overview
 -----------------
 
-The **Roman Galaxy Redshift Survey (GRS)** covariance mocks pipeline is designed for generating mock galaxy catalogs from AbacusSummit N-body simulations as part of the **Roman GRS Project Infrastructure Team (PIT)** analysis framework. The pipeline consists of modular components that handle different aspects of the mock generation process and runs on the **Perlmutter system at NERSC**.
+The **Roman Galaxy Redshift Survey (GRS)** covariance mocks pipeline generates mock galaxy catalogs from AbacusSummit N-body simulations as part of the **Roman GRS Project Infrastructure Team (PIT)** analysis framework. The pipeline consists of modular components that handle different aspects of the mock generation process and runs on the **Perlmutter system at NERSC**.
 
 Architecture
 ~~~~~~~~~~~~
@@ -13,9 +13,14 @@ The modular pipeline consists of 5 core modules:
 
 * **data_loader** - Halo catalog loading and filtering with MPI slab decomposition
 * **galaxy_generator** - Galaxy population modeling using rgrspit_diffsky  
-* **hdf5_writer** - Parallel HDF5 output operations for efficient data storage
+* **hdf5_writer** - Parallel HDF5 output operations for data storage
 * **mpi_setup** - MPI and JAX initialization for distributed computing
 * **utils** - Common utility functions for path validation and filename generation
+
+The campaign management system adds:
+
+* **campaign_config** - YAML configuration validation and hierarchical inheritance
+* **campaign_manager** - SQLite job tracking and SLURM array orchestration
 
 Configuration
 -------------
@@ -74,10 +79,10 @@ The pipeline supports both single-process and parallel HDF5 output:
 HPC Integration
 ---------------
 
-SLURM Job Submission
-~~~~~~~~~~~~~~~~~~~~
+Single Mock SLURM Job Submission
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The pipeline is designed for HPC environments with SLURM job scheduling. Example job script:
+The pipeline runs on HPC environments with SLURM job scheduling. Example job script for single mock generation:
 
 .. code-block:: bash
 
@@ -92,15 +97,35 @@ The pipeline is designed for HPC environments with SLURM job scheduling. Example
    
    srun python scripts/generate_single_mock.py nersc /output/path
 
+Campaign SLURM Array Jobs
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For large-scale campaigns, the system uses SLURM array jobs:
+
+.. code-block:: bash
+
+   #!/bin/bash
+   #SBATCH --job-name=campaign_mock_gen
+   #SBATCH --array=1-500
+   #SBATCH --nodes=1
+   #SBATCH --ntasks-per-node=32
+   #SBATCH --time=02:00:00
+   #SBATCH --output=campaign_logs/job_%A_%a.out
+   
+   source scripts/load_env.sh
+   
+   # Campaign manager handles job parameters based on array index
+   python scripts/run_campaign.py execute my_campaign $SLURM_ARRAY_TASK_ID
+
 MPI Scaling
 ~~~~~~~~~~~
 
-The pipeline scales efficiently across multiple nodes:
+The pipeline scales across multiple nodes:
 
 * **Slab Decomposition**: Halos distributed by spatial coordinates
 * **Independent Processing**: Each rank processes its assigned halos
 * **Collective Output**: Coordinated parallel HDF5 writes
-* **Memory Efficiency**: Only loads data needed for each rank's slab
+* **Memory Usage**: Only loads data needed for each rank's slab
 
 Troubleshooting
 ---------------
@@ -141,7 +166,7 @@ Performance Optimization
 - Configure JAX memory allocation settings
 - Use appropriate precision settings (float32 vs float64)
 
-**I/O Optimization**:
+**I/O Configuration**:
 - Use parallel file systems (Lustre, GPFS)
 - Configure HDF5 chunking and compression
 - Consider collective I/O vs independent writes

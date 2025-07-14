@@ -78,30 +78,34 @@ class TestUtilityFunctions:
     @pytest.mark.unit
     def test_parse_shell_args_empty(self):
         """Test parsing empty arguments."""
-        force_run, test_mode = parse_shell_args([])
+        force_run, test_mode, verbose = parse_shell_args([])
         assert force_run is False
         assert test_mode is False
+        assert verbose is False
     
     @pytest.mark.unit
     def test_parse_shell_args_force(self):
         """Test parsing --force argument."""
-        force_run, test_mode = parse_shell_args(["--force"])
+        force_run, test_mode, verbose = parse_shell_args(["--force"])
         assert force_run is True
         assert test_mode is False
+        assert verbose is False
     
     @pytest.mark.unit
     def test_parse_shell_args_test(self):
         """Test parsing --test argument."""
-        force_run, test_mode = parse_shell_args(["--test"])
+        force_run, test_mode, verbose = parse_shell_args(["--test"])
         assert force_run is False
         assert test_mode is True
+        assert verbose is False
     
     @pytest.mark.unit
     def test_parse_shell_args_both(self):
         """Test parsing both arguments."""
-        force_run, test_mode = parse_shell_args(["--force", "--test"])
+        force_run, test_mode, verbose = parse_shell_args(["--force", "--test"])
         assert force_run is True
         assert test_mode is True
+        assert verbose is False
     
     @pytest.mark.unit
     def test_parse_shell_args_invalid(self):

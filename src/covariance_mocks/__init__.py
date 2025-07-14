@@ -24,3 +24,11 @@ try:
 except ImportError:
     # Optional module imports
     pass
+
+# Import campaign management modules
+try:
+    from .campaign_config import CampaignConfigValidator, CampaignConfigLoader, validate_campaign_config
+    from .campaign_manager import CampaignManager, JobDatabase, JobSpec, BatchSpec, JobStatus
+except ImportError:
+    # Campaign management modules not available
+    pass

@@ -2,7 +2,7 @@
 
 Modular pipeline for generating mock galaxy catalogs from AbacusSummit halo catalogs using the rgrspit_diffsky package. This code generates large-scale covariance mocks for the **Roman Galaxy Redshift Survey (GRS)** as part of the **Roman GRS Project Infrastructure Team (PIT)** analysis pipeline.
 
-**System Requirements**: Designed to run on the **Perlmutter system at NERSC** under the Roman GRS PIT account (m4943).
+**System Requirements**: Runs on the **Perlmutter system at NERSC** under the Roman GRS PIT account (m4943).
 
 **📖 Full Documentation**: [https://grs-pit-covariance-mocks.readthedocs.io](https://grs-pit-covariance-mocks.readthedocs.io)
 
@@ -15,6 +15,8 @@ The pipeline uses a **modular architecture** with core functionality organized i
 - **`hdf5_writer.py`** - Parallel HDF5 output with MPI collective I/O
 - **`mpi_setup.py`** - MPI initialization and domain decomposition
 - **`utils.py`** - Shared utilities and configuration
+- **`campaign_config.py`** - YAML configuration validation and hierarchical inheritance
+- **`campaign_manager.py`** - SQLite job tracking and SLURM array orchestration
 
 ## Installation
 
@@ -28,7 +30,7 @@ cd covariance-mocks
 
 ## Quick Start on Perlmutter (NERSC)
 
-### Generate Mock Catalog and Figure
+### Single Mock Generation
 
 ```bash
 # Load environment and generate mock catalog
@@ -40,6 +42,25 @@ source scripts/load_env.sh
 
 # Force regeneration of existing catalogs
 ./scripts/make_mocks.sh --force
+```
+
+### Campaign Management (Large Scale)
+
+```bash
+# Load environment
+source scripts/load_env.sh
+
+# Initialize a campaign
+python scripts/run_campaign.py init my_campaign config/examples/production_campaign.yaml
+
+# Submit jobs to SLURM
+python scripts/run_campaign.py submit my_campaign
+
+# Monitor progress
+python scripts/run_campaign.py status my_campaign
+
+# Retry failed jobs
+python scripts/run_campaign.py retry my_campaign
 ```
 
 ### Manual Pipeline Steps
@@ -65,9 +86,9 @@ python scripts/plot_mock_catalog.py /path/to/output/mock_catalog.hdf5
 ## Key Features
 
 - **MPI Parallelization**: Scales across multiple GPUs/nodes
-- **Slab Decomposition**: Efficient domain decomposition for large catalogs
-- **Parallel HDF5**: Collective I/O operations for performance
-- **Production Scale**: Designed for 40,000+ catalog generation runs
+- **Slab Decomposition**: Domain decomposition for large catalogs
+- **Parallel HDF5**: Collective I/O operations
+- **Production Scale**: Supports 40,000+ catalog generation runs
 
 ## Output Files
 
@@ -101,7 +122,7 @@ For comprehensive information, see the **[full documentation on Read the Docs](h
 
 ## Testing
 
-The project includes comprehensive testing with pytest integration and SLURM validation:
+The project includes testing with pytest integration and SLURM validation:
 
 ### Quick Development Testing (< 5 minutes)
 ```bash
@@ -139,7 +160,7 @@ See `TESTING.md` for detailed testing procedures and `CLAUDE.md` for development
 
 ## Environment
 
-The pipeline is specifically designed for the **Roman GRS Project Infrastructure Team (PIT)** and requires:
+The pipeline is built for the **Roman GRS Project Infrastructure Team (PIT)** and requires:
 - **NERSC Perlmutter system** with GPU nodes (account m4943)
 - Conda environment with JAX, rgrspit_diffsky, and scientific Python stack
 - MPI support with parallel HDF5
