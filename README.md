@@ -16,6 +16,16 @@ The pipeline uses a **modular architecture** with core functionality organized i
 - **`mpi_setup.py`** - MPI initialization and domain decomposition
 - **`utils.py`** - Shared utilities and configuration
 
+## Installation
+
+### Clone Repository
+
+```bash
+# Clone the repository
+git clone https://github.com/roman-grs-pit/covariance-mocks.git
+cd covariance-mocks
+```
+
 ## Quick Start on Perlmutter (NERSC)
 
 ### Generate Mock Catalog and Figure

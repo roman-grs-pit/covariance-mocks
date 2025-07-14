@@ -1,6 +1,17 @@
 Installation
 ============
 
+Clone Repository
+----------------
+
+First, clone the repository on Perlmutter:
+
+.. code-block:: bash
+
+   # Clone the repository
+   git clone https://github.com/roman-grs-pit/covariance-mocks.git
+   cd covariance-mocks
+
 System Requirements
 -------------------
 

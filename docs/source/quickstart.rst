@@ -1,6 +1,20 @@
 Quick Start on Perlmutter (NERSC)
 =================================
 
+Installation and Setup
+-----------------------
+
+First, clone the repository and set up the environment:
+
+.. code-block:: bash
+
+   # Clone the repository
+   git clone https://github.com/roman-grs-pit/covariance-mocks.git
+   cd covariance-mocks
+   
+   # Load environment on Perlmutter
+   source scripts/load_env.sh
+
 Basic Usage for Roman GRS PIT
 ------------------------------
 
@@ -8,9 +22,6 @@ Generate a mock galaxy catalog for the Roman Galaxy Redshift Survey on Perlmutte
 
 .. code-block:: bash
 
-   # Load environment on Perlmutter
-   source scripts/load_env.sh
-   
    # Run mock generation (Roman GRS PIT account)
    python scripts/generate_single_mock.py nersc /path/to/output/directory
 
