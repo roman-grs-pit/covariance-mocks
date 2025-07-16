@@ -1,13 +1,13 @@
-"""Tests for campaign configuration validation and loading."""
+"""Tests for production configuration validation and loading."""
 
 import pytest
 import yaml
 import tempfile
 from pathlib import Path
 
-from covariance_mocks.campaign_config import (
-    CampaignConfigValidator, 
-    CampaignConfigLoader,
+from covariance_mocks.production_config import (
+    ProductionConfigValidator, 
+    ProductionConfigLoader,
     ConfigurationError,
     ValidationError
 )
@@ -25,9 +25,9 @@ def test_config_dir():
         (config_dir / "examples").mkdir()
         
         # Create minimal schema for testing
-        test_schema = config_dir / "schemas" / "campaign_schema.yaml"
+        test_schema = config_dir / "schemas" / "production_schema.yaml"
         schema_content = {
-            "campaign": {
+            "production": {
                 "type": "object",
                 "required": ["name", "version"],
                 "properties": {
@@ -67,30 +67,30 @@ def test_config_dir():
 @pytest.fixture
 def validator(test_config_dir):
     """Create validator with test schema."""
-    schema_path = test_config_dir / "schemas" / "campaign_schema.yaml"
-    return CampaignConfigValidator(schema_path)
+    schema_path = test_config_dir / "schemas" / "production_schema.yaml"
+    return ProductionConfigValidator(schema_path)
 
 
 @pytest.fixture
 def config_loader(test_config_dir):
     """Create config loader with test directory."""
-    loader = CampaignConfigLoader(test_config_dir)
+    loader = ProductionConfigLoader(test_config_dir)
     # Use test schema instead of production schema
-    schema_path = test_config_dir / "schemas" / "campaign_schema.yaml"
-    loader.validator = CampaignConfigValidator(schema_path)
+    schema_path = test_config_dir / "schemas" / "production_schema.yaml"
+    loader.validator = ProductionConfigValidator(schema_path)
     return loader
 
 
-class TestCampaignConfigValidator:
+class TestProductionConfigValidator:
     """Test configuration validation."""
     
     def test_valid_config_passes(self, validator):
         """Test that valid configuration passes validation."""
         config = {
-            "campaign": {
-                "name": "test_campaign",
+            "production": {
+                "name": "test_production",
                 "version": "v1.0",
-                "description": "Test campaign for validation testing"
+                "description": "Test production for validation testing"
             },
             "science": {
                 "cosmology": "AbacusSummit",
@@ -105,7 +105,7 @@ class TestCampaignConfigValidator:
                 "batch_size": 5
             },
             "outputs": {
-                "base_path": "/tmp/test_campaign"
+                "base_path": "/tmp/test_production"
             }
         }
         
@@ -115,8 +115,8 @@ class TestCampaignConfigValidator:
     def test_missing_required_section_fails(self, validator):
         """Test that missing required section fails validation."""
         config = {
-            "campaign": {
-                "name": "test_campaign",
+            "production": {
+                "name": "test_production",
                 "version": "v1.0"
             }
             # Missing required 'science' section
@@ -129,7 +129,7 @@ class TestCampaignConfigValidator:
     def test_invalid_name_pattern_fails(self, validator):
         """Test that invalid name pattern fails validation."""
         config = {
-            "campaign": {
+            "production": {
                 "name": "123invalid",  # Starts with number
                 "version": "v1.0"
             },
@@ -145,8 +145,8 @@ class TestCampaignConfigValidator:
     def test_invalid_type_fails(self, validator):
         """Test that invalid types fail validation."""
         config = {
-            "campaign": {
-                "name": "test_campaign",
+            "production": {
+                "name": "test_production",
                 "version": "v1.0"
             },
             "science": {
@@ -159,15 +159,15 @@ class TestCampaignConfigValidator:
         assert any("array" in error.message for error in errors)
 
 
-class TestCampaignConfigLoader:
+class TestProductionConfigLoader:
     """Test configuration loading and merging."""
     
-    def test_load_campaign_config_success(self, config_loader, test_config_dir):
+    def test_load_production_config_success(self, config_loader, test_config_dir):
         """Test successful configuration loading."""
-        # Create test campaign config
-        campaign_config = {
-            "campaign": {
-                "name": "test_campaign",
+        # Create test production config
+        production_config = {
+            "production": {
+                "name": "test_production",
                 "version": "v1.0"
             },
             "science": {
@@ -178,29 +178,29 @@ class TestCampaignConfigLoader:
             }
         }
         
-        config_path = test_config_dir / "test_campaign.yaml"
+        config_path = test_config_dir / "test_production.yaml"
         with open(config_path, 'w') as f:
-            yaml.dump(campaign_config, f)
+            yaml.dump(production_config, f)
         
         # Load and validate
-        merged_config = config_loader.load_campaign_config(config_path, "test_machine")
+        merged_config = config_loader.load_production_config(config_path, "test_machine")
         
         # Check that defaults were merged
         assert merged_config["resources"]["account"] == "test_account"
         assert merged_config["execution"]["job_type"] == "balanced"
         
-        # Check that campaign overrides were applied
+        # Check that production overrides were applied
         assert merged_config["execution"]["batch_size"] == 20
         
-        # Check that campaign-specific values are preserved
-        assert merged_config["campaign"]["name"] == "test_campaign"
+        # Check that production-specific values are preserved
+        assert merged_config["production"]["name"] == "test_production"
         assert merged_config["science"]["redshifts"] == [1.0, 2.0]
     
     def test_missing_machine_defaults_fails(self, config_loader, test_config_dir):
         """Test that missing machine defaults fails."""
-        campaign_config = {
-            "campaign": {
-                "name": "test_campaign",
+        production_config = {
+            "production": {
+                "name": "test_production",
                 "version": "v1.0"
             },
             "science": {
@@ -208,17 +208,17 @@ class TestCampaignConfigLoader:
             }
         }
         
-        config_path = test_config_dir / "test_campaign.yaml"
+        config_path = test_config_dir / "test_production.yaml"
         with open(config_path, 'w') as f:
-            yaml.dump(campaign_config, f)
+            yaml.dump(production_config, f)
         
         with pytest.raises(ConfigurationError, match="No defaults found"):
-            config_loader.load_campaign_config(config_path, "nonexistent_machine")
+            config_loader.load_production_config(config_path, "nonexistent_machine")
     
-    def test_invalid_campaign_config_fails(self, config_loader, test_config_dir):
-        """Test that invalid campaign config fails validation."""
-        campaign_config = {
-            "campaign": {
+    def test_invalid_production_config_fails(self, config_loader, test_config_dir):
+        """Test that invalid production config fails validation."""
+        production_config = {
+            "production": {
                 "name": "123invalid",  # Invalid name pattern
                 "version": "v1.0"
             },
@@ -227,12 +227,12 @@ class TestCampaignConfigLoader:
             }
         }
         
-        config_path = test_config_dir / "test_campaign.yaml"
+        config_path = test_config_dir / "test_production.yaml"
         with open(config_path, 'w') as f:
-            yaml.dump(campaign_config, f)
+            yaml.dump(production_config, f)
         
         with pytest.raises(ConfigurationError, match="Configuration validation failed"):
-            config_loader.load_campaign_config(config_path, "test_machine")
+            config_loader.load_production_config(config_path, "test_machine")
 
 
 @pytest.mark.unit
@@ -242,10 +242,10 @@ class TestRealConfigFiles:
     def test_real_schema_loads(self):
         """Test that real schema file loads without errors."""
         repo_root = Path(__file__).parent.parent
-        schema_path = repo_root / "config" / "schemas" / "campaign_schema.yaml"
+        schema_path = repo_root / "config" / "schemas" / "production_schema.yaml"
         
         if schema_path.exists():
-            validator = CampaignConfigValidator(schema_path)
+            validator = ProductionConfigValidator(schema_path)
             assert validator.schema is not None
     
     def test_real_defaults_load(self):
@@ -254,7 +254,7 @@ class TestRealConfigFiles:
         defaults_path = repo_root / "config" / "defaults" / "nersc.yaml"
         
         if defaults_path.exists():
-            loader = CampaignConfigLoader(repo_root)
+            loader = ProductionConfigLoader(repo_root)
             defaults = loader._load_machine_defaults("nersc")
             assert "resources" in defaults
             assert "execution" in defaults
@@ -265,12 +265,12 @@ class TestRealConfigFiles:
         examples_dir = repo_root / "config" / "examples"
         
         if examples_dir.exists():
-            loader = CampaignConfigLoader(repo_root)
+            loader = ProductionConfigLoader(repo_root)
             
             for config_file in examples_dir.glob("*.yaml"):
                 try:
-                    merged_config = loader.load_campaign_config(config_file, "nersc")
-                    assert "campaign" in merged_config
+                    merged_config = loader.load_production_config(config_file, "nersc")
+                    assert "production" in merged_config
                     assert "science" in merged_config
                 except ConfigurationError as e:
                     pytest.fail(f"Example config {config_file.name} failed validation: {e}")

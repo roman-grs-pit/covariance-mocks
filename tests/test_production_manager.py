@@ -1,4 +1,4 @@
-"""Tests for campaign manager functionality."""
+"""Tests for production manager functionality."""
 
 import pytest
 import tempfile
@@ -7,8 +7,8 @@ import yaml
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from covariance_mocks.campaign_manager import (
-    CampaignManager,
+from covariance_mocks.production_manager import (
+    ProductionManager,
     JobDatabase,
     JobSpec,
     BatchSpec,
@@ -17,13 +17,13 @@ from covariance_mocks.campaign_manager import (
 
 
 @pytest.fixture
-def test_campaign_config():
-    """Create test campaign configuration."""
+def test_production_config():
+    """Create test production configuration."""
     return {
-        "campaign": {
-            "name": "test_campaign",
+        "production": {
+            "name": "test_production",
             "version": "v1.0",
-            "description": "Test campaign for unit testing"
+            "description": "Test production for unit testing"
         },
         "science": {
             "cosmology": "AbacusSummit",
@@ -54,7 +54,7 @@ def test_campaign_config():
             "memory_gb": 8.0
         },
         "outputs": {
-            "base_path": "/tmp/test_campaigns",
+            "base_path": "/tmp/test_productions",
             "structure": "hierarchical",
             "compression": "gzip"
         }
@@ -62,10 +62,10 @@ def test_campaign_config():
 
 
 @pytest.fixture
-def temp_config_file(test_campaign_config):
+def temp_config_file(test_production_config):
     """Create temporary configuration file."""
     with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
-        yaml.dump(test_campaign_config, f)
+        yaml.dump(test_production_config, f)
         yield Path(f.name)
     
     # Cleanup
@@ -142,8 +142,8 @@ class TestJobDatabase:
         assert len(running_jobs) == 1
         assert running_jobs[0].slurm_job_id == 12345
     
-    def test_campaign_stats(self, temp_work_dir):
-        """Test campaign statistics calculation."""
+    def test_production_stats(self, temp_work_dir):
+        """Test production statistics calculation."""
         db_path = temp_work_dir / "test.db"
         db = JobDatabase(db_path)
         
@@ -159,31 +159,31 @@ class TestJobDatabase:
             db.insert_job(job)
         
         # Get statistics
-        stats = db.get_campaign_stats()
+        stats = db.get_production_stats()
         assert stats["pending"] == 1
         assert stats["running"] == 1
         assert stats["completed"] == 1
         assert stats["failed"] == 1
 
 
-class TestCampaignManager:
-    """Test campaign manager functionality."""
+class TestProductionManager:
+    """Test production manager functionality."""
     
-    @patch('covariance_mocks.campaign_manager.CampaignConfigLoader')
-    def test_manager_initialization(self, mock_loader, temp_config_file, temp_work_dir, test_campaign_config):
-        """Test campaign manager initialization."""
+    @patch('covariance_mocks.production_manager.ProductionConfigLoader')
+    def test_manager_initialization(self, mock_loader, temp_config_file, temp_work_dir, test_production_config):
+        """Test production manager initialization."""
         # Mock config loader
         mock_loader_instance = MagicMock()
-        mock_loader_instance.load_campaign_config.return_value = test_campaign_config
+        mock_loader_instance.load_production_config.return_value = test_production_config
         mock_loader.return_value = mock_loader_instance
         
         # Create manager
-        manager = CampaignManager(temp_config_file, "test_machine", temp_work_dir)
+        manager = ProductionManager(temp_config_file, "test_machine", temp_work_dir)
         
         # Check initialization
         assert manager.work_dir == temp_work_dir
         assert manager.machine == "test_machine"
-        assert manager.config == test_campaign_config
+        assert manager.config == test_production_config
         
         # Check directory creation
         assert (temp_work_dir / "catalogs").exists()
@@ -192,20 +192,20 @@ class TestCampaignManager:
         assert (temp_work_dir / "qa").exists()
         
         # Check config file save
-        config_file = temp_work_dir / "metadata" / "campaign_config.yaml"
+        config_file = temp_work_dir / "metadata" / "production_config.yaml"
         assert config_file.exists()
     
-    @patch('covariance_mocks.campaign_manager.CampaignConfigLoader')
-    def test_campaign_initialization(self, mock_loader, temp_config_file, temp_work_dir, test_campaign_config):
-        """Test campaign job creation."""
+    @patch('covariance_mocks.production_manager.ProductionConfigLoader')
+    def test_production_initialization(self, mock_loader, temp_config_file, temp_work_dir, test_production_config):
+        """Test production job creation."""
         # Mock config loader
         mock_loader_instance = MagicMock()
-        mock_loader_instance.load_campaign_config.return_value = test_campaign_config
+        mock_loader_instance.load_production_config.return_value = test_production_config
         mock_loader.return_value = mock_loader_instance
         
-        # Create manager and initialize campaign
-        manager = CampaignManager(temp_config_file, "test_machine", temp_work_dir)
-        jobs_created = manager.initialize_campaign()
+        # Create manager and initialize production
+        manager = ProductionManager(temp_config_file, "test_machine", temp_work_dir)
+        jobs_created = manager.initialize_production()
         
         # Should create 4 realizations × 2 redshifts = 8 jobs
         assert jobs_created == 8
@@ -224,21 +224,21 @@ class TestCampaignManager:
         }
         assert job_ids == expected_ids
     
-    @patch('covariance_mocks.campaign_manager.CampaignConfigLoader')
+    @patch('covariance_mocks.production_manager.ProductionConfigLoader')
     @patch('subprocess.run')
-    def test_submit_pending_jobs(self, mock_subprocess, mock_loader, temp_config_file, temp_work_dir, test_campaign_config):
+    def test_submit_pending_jobs(self, mock_subprocess, mock_loader, temp_config_file, temp_work_dir, test_production_config):
         """Test job submission to SLURM."""
         # Mock config loader
         mock_loader_instance = MagicMock()
-        mock_loader_instance.load_campaign_config.return_value = test_campaign_config
+        mock_loader_instance.load_production_config.return_value = test_production_config
         mock_loader.return_value = mock_loader_instance
         
         # Mock subprocess (sbatch)
         mock_subprocess.return_value.stdout = "Submitted batch job 12345\n"
         
         # Create manager and initialize
-        manager = CampaignManager(temp_config_file, "test_machine", temp_work_dir)
-        manager.initialize_campaign()
+        manager = ProductionManager(temp_config_file, "test_machine", temp_work_dir)
+        manager.initialize_production()
         
         # Submit jobs
         submitted_batches = manager.submit_pending_jobs()
@@ -253,16 +253,16 @@ class TestCampaignManager:
         queued_jobs = manager.job_db.get_jobs_by_status(JobStatus.QUEUED)
         assert len(queued_jobs) == 8
     
-    @patch('covariance_mocks.campaign_manager.CampaignConfigLoader')
-    def test_retry_failed_jobs(self, mock_loader, temp_config_file, temp_work_dir, test_campaign_config):
+    @patch('covariance_mocks.production_manager.ProductionConfigLoader')
+    def test_retry_failed_jobs(self, mock_loader, temp_config_file, temp_work_dir, test_production_config):
         """Test retrying failed jobs."""
         # Mock config loader
         mock_loader_instance = MagicMock()
-        mock_loader_instance.load_campaign_config.return_value = test_campaign_config
+        mock_loader_instance.load_production_config.return_value = test_production_config
         mock_loader.return_value = mock_loader_instance
         
         # Create manager
-        manager = CampaignManager(temp_config_file, "test_machine", temp_work_dir)
+        manager = ProductionManager(temp_config_file, "test_machine", temp_work_dir)
         
         # Create some failed jobs
         failed_jobs = [
@@ -289,27 +289,27 @@ class TestCampaignManager:
         assert len(failed_jobs) == 1
         assert failed_jobs[0].job_id == "job_003"
     
-    @patch('covariance_mocks.campaign_manager.CampaignConfigLoader')
-    def test_campaign_summary(self, mock_loader, temp_config_file, temp_work_dir, test_campaign_config):
-        """Test campaign summary generation."""
+    @patch('covariance_mocks.production_manager.ProductionConfigLoader')
+    def test_production_summary(self, mock_loader, temp_config_file, temp_work_dir, test_production_config):
+        """Test production summary generation."""
         # Mock config loader
         mock_loader_instance = MagicMock()
-        mock_loader_instance.load_campaign_config.return_value = test_campaign_config
+        mock_loader_instance.load_production_config.return_value = test_production_config
         mock_loader.return_value = mock_loader_instance
         
         # Create manager and initialize
-        manager = CampaignManager(temp_config_file, "test_machine", temp_work_dir)
-        manager.initialize_campaign()
+        manager = ProductionManager(temp_config_file, "test_machine", temp_work_dir)
+        manager.initialize_production()
         
         # Mark some jobs as completed
         manager.job_db.update_job_status("r0000_z1.000", JobStatus.COMPLETED)
         manager.job_db.update_job_status("r0001_z1.000", JobStatus.COMPLETED)
         
         # Get summary
-        summary = manager.get_campaign_summary()
+        summary = manager.get_production_summary()
         
         # Check summary structure
-        assert "campaign" in summary
+        assert "production" in summary
         assert "statistics" in summary
         assert "configuration" in summary
         

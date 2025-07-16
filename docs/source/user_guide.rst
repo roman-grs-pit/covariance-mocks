@@ -17,10 +17,10 @@ The modular pipeline consists of 5 core modules:
 * **mpi_setup** - MPI and JAX initialization for distributed computing
 * **utils** - Common utility functions for path validation and filename generation
 
-The campaign management system adds:
+The production management system adds:
 
-* **campaign_config** - YAML configuration validation and hierarchical inheritance
-* **campaign_manager** - SQLite job tracking and SLURM array orchestration
+* **production_config** - YAML configuration validation and hierarchical inheritance
+* **production_manager** - SQLite job tracking and SLURM array orchestration
 
 Configuration
 -------------
@@ -97,25 +97,25 @@ The pipeline runs on HPC environments with SLURM job scheduling. Example job scr
    
    srun python scripts/generate_single_mock.py nersc /output/path
 
-Campaign SLURM Array Jobs
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+Production SLURM Array Jobs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For large-scale campaigns, the system uses SLURM array jobs:
+For large-scale productions, the system uses SLURM array jobs:
 
 .. code-block:: bash
 
    #!/bin/bash
-   #SBATCH --job-name=campaign_mock_gen
+   #SBATCH --job-name=production_mock_gen
    #SBATCH --array=1-500
    #SBATCH --nodes=1
    #SBATCH --ntasks-per-node=32
    #SBATCH --time=02:00:00
-   #SBATCH --output=campaign_logs/job_%A_%a.out
+   #SBATCH --output=production_logs/job_%A_%a.out
    
    source scripts/load_env.sh
    
-   # Campaign manager handles job parameters based on array index
-   python scripts/run_campaign.py execute my_campaign $SLURM_ARRAY_TASK_ID
+   # Production manager handles job parameters based on array index
+   python scripts/run_production.py execute my_production $SLURM_ARRAY_TASK_ID
 
 MPI Scaling
 ~~~~~~~~~~~
@@ -126,6 +126,64 @@ The pipeline scales across multiple nodes:
 * **Independent Processing**: Each rank processes its assigned halos
 * **Collective Output**: Coordinated parallel HDF5 writes
 * **Memory Usage**: Only loads data needed for each rank's slab
+
+Production Management
+---------------------
+
+For large-scale mock generation productions (thousands of jobs), use the production management system with a three-stage workflow:
+
+Three-Stage Workflow
+~~~~~~~~~~~~~~~~~~~~~
+
+**Stage 1: Initialize Production**
+
+.. code-block:: bash
+
+   # Create production structure and validate configuration
+   python scripts/run_production.py init alpha config/examples/alpha_production.yaml
+
+This creates the production directory structure:
+
+.. code-block:: text
+
+   /productions/alpha_v1.0/
+   ├── catalogs/           # Generated HDF5 catalogs
+   ├── scripts/            # SLURM scripts (generated in Stage 2)
+   ├── logs/              # Job execution logs
+   ├── production.yaml    # Production configuration
+   └── production.db      # SQLite job tracking database
+
+**Stage 2: Generate SLURM Scripts (Optional)**
+
+.. code-block:: bash
+
+   # Generate scripts for inspection before submission
+   python scripts/run_production.py stage alpha
+
+This creates SLURM job scripts in the ``scripts/`` directory that can be reviewed before submission.
+
+**Stage 3: Submit Jobs**
+
+.. code-block:: bash
+
+   # Submit pre-generated scripts to SLURM
+   python scripts/run_production.py submit alpha
+
+   # Monitor progress
+   python scripts/run_production.py status alpha
+
+   # Retry failed jobs
+   python scripts/run_production.py retry alpha
+
+Directory Structure
+~~~~~~~~~~~~~~~~~~~
+
+Productions use clean directory organization:
+
+* **Production naming**: ``/productions/production_version/`` (e.g., ``/productions/alpha_v1.0/``)
+* **No redundant prefixes**: Production names are simplified without redundant prefixes
+* **Organized subdirectories**: Separate directories for catalogs, scripts, logs, and metadata
+* **Job tracking**: SQLite database maintains job state and execution history
 
 Troubleshooting
 ---------------

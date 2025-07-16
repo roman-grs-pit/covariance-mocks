@@ -1,23 +1,6 @@
 Development Guide
 =================
 
-Development Protocols
-----------------------
-
-**BASELINE PROTECTION**: Maintain existing test pass rate throughout ALL development phases.
-
-**GIT WORKFLOW**:
-- Use feature branches for each development phase
-- Never work directly on main branch
-- Commit frequently with descriptive messages
-- Include test status in commit messages
-
-**CHANGE MANAGEMENT**:
-- Maximum 200 lines changed per commit
-- Maximum 5 files modified per commit
-- Test after every significant change
-- Rollback immediately if tests fail
-
 Testing Structure
 -----------------
 
@@ -79,11 +62,11 @@ The testing architecture uses session-scoped fixtures to minimize pipeline execu
 
 **Reference Data Validation**:
 
-* **Reference catalog**: ``/global/cfs/cdirs/m4943/Simulations/covariance_mocks/data/validated/mock_AbacusSummit_small_c000_ph3000_z1.100.hdf5``
+* **Reference catalog**: ``/global/cfs/cdirs/m4943/Simulations/covariance_mocks/validation/validated/mock_AbacusSummit_small_c000_ph3000_z1.100.hdf5``
 * **HDF5 dataset comparison**: Exact equality for integers, tolerance-based for floating point
 * **Reproducibility testing**: Multiple runs produce identical results
 
-**CRITICAL RULE**: Always save complete test output to log files before analysis.
+Always save complete test output to log files before analysis.
 
 **Development Testing Pattern**:
 
@@ -106,12 +89,6 @@ The testing architecture uses session-scoped fixtures to minimize pipeline execu
    nohup pytest -m "slow or validation" -v --timeout=1800 > validation.log 2>&1 &
    # 3. Monitor progress
    tail -f validation.log
-
-**MANDATORY ITERATIVE TESTING**: When fixing test failures, continue iterating until ALL tests pass:
-
-1. **Run tests** → **Identify failures** → **Fix issues** → **Immediately re-run tests**
-2. **Never stop after a single fix** - keep cycling until 100% pass rate
-3. **Don't declare success until full test suite passes**
 
 **Testing Workflow**:
 

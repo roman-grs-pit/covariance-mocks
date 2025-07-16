@@ -86,25 +86,41 @@ def main():
         type=int, 
         help="Test mode: use only N halos with smallest x coordinates"
     )
+    
+    parser.add_argument(
+        "--realization",
+        type=str,
+        help="Realization number (e.g., '3000')"
+    )
+    
+    parser.add_argument(
+        "--redshift",
+        type=str,
+        help="Redshift value (e.g., '0.1')"
+    )
 
     args = parser.parse_args()
     machine = args.machine
     drnout = args.drnout
     n_gen = args.test
+    realization = args.realization
+    redshift = args.redshift
 
     if machine == "nersc":
-        # Build path for current configuration
-        catalog_path = build_abacus_path(
-            ABACUS_BASE_PATH, "small", SIMULATION_BOX, 
-            CURRENT_PHASE, CURRENT_REDSHIFT
+        # Build path for current configuration using dynamic parameters
+        phase = f"ph{realization}" if realization else CURRENT_PHASE
+        z_str = f"z{float(redshift):.3f}" if redshift else CURRENT_REDSHIFT
+        # Build path directly since AbacusSummit uses specific directory structure
+        catalog_path = os.path.join(
+            ABACUS_BASE_PATH, f"AbacusSummit_small_c000_{phase}", "halos", z_str
         )
         
         # Verify path exists
         validate_catalog_path(catalog_path)
         
-        # Generate output filename
+        # Generate output filename using dynamic parameters
         output_filename = generate_output_filename(
-            SIMULATION_BOX, CURRENT_PHASE, CURRENT_REDSHIFT, n_gen
+            SIMULATION_BOX, phase, z_str, n_gen
         )
         output_path = os.path.join(drnout, output_filename)
         

@@ -1,11 +1,14 @@
-# Production Campaign Configuration
-# Full-scale campaign for generating covariance mocks
+# Production Configuration
+# Full-scale production for generating covariance mocks
 
-campaign:
+production:
   name: "covariance_v1"
   version: "v1.0"
-  description: "Production campaign for covariance mock generation with 2000 realizations across 20 redshift snapshots"
+  description: "Production for covariance mock generation with 2000 realizations across 20 redshift snapshots"
   tags: ["production", "covariance", "abacus_summit"]
+  dependencies:
+    # rgrspit_diffsky version will be auto-detected if not specified
+    record_environment: true
 
 science:
   cosmology: "AbacusSummit"
@@ -31,7 +34,7 @@ execution:
 # (will be loaded from config/defaults/nersc.yaml)
 
 outputs:
-  base_path: "/global/cfs/cdirs/m4943/Simulations/covariance_mocks/campaigns"
+  base_path: "/global/cfs/cdirs/m4943/Simulations/covariance_mocks/production"
   structure: "hierarchical"
   compression: "gzip"
   cleanup_policy:

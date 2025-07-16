@@ -1,10 +1,10 @@
-# Test Campaign Configuration
-# Small-scale campaign for development and testing
+# Test Production Configuration
+# Small-scale production for development and testing
 
-campaign:
+production:
   name: "test_basic"
   version: "v1.0"
-  description: "Basic test campaign with minimal resources for development validation"
+  description: "Basic test production with minimal resources for development validation"
   tags: ["test", "development", "validation"]
 
 science:
@@ -34,7 +34,7 @@ resources:
   memory_gb: 64.0
 
 outputs:
-  base_path: "/tmp/test_campaigns"
+  base_path: "/tmp/test_production"
   structure: "hierarchical"
   compression: "gzip"
   cleanup_policy:

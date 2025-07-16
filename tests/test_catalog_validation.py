@@ -21,7 +21,7 @@ from tests.integration_core import MockGenerationConfig, run_full_pipeline
 
 
 # Reference catalog location
-REFERENCE_CATALOG = Path("/global/cfs/cdirs/m4943/Simulations/covariance_mocks/data/validated/mock_AbacusSummit_small_c000_ph3000_z1.100.hdf5")
+REFERENCE_CATALOG = Path("/global/cfs/cdirs/m4943/Simulations/covariance_mocks/validation/validated/mock_AbacusSummit_small_c000_ph3000_z1.100.hdf5")
 
 
 @pytest.fixture
@@ -36,7 +36,7 @@ def reference_catalog_path():
 def validation_output_dir():
     """Provide output directory for validation tests."""
     # Use shared filesystem location for MPI-HDF5 compatibility
-    base_dir = Path("/global/cfs/cdirs/m4943/Simulations/covariance_mocks/data/tmp")
+    base_dir = Path("/global/cfs/cdirs/m4943/Simulations/covariance_mocks/validation/tmp")
     base_dir.mkdir(parents=True, exist_ok=True)
     
     # Create unique temporary directory

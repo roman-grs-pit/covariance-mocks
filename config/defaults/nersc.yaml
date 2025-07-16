@@ -43,7 +43,7 @@ job_type_overrides:
   gpu_intensive:
     partition: "gpu"
     constraint: "gpu"
-    nodes_per_job: 1
+    nodes_per_job: 2
     tasks_per_node: 4
     cpus_per_task: 32
     memory_gb: 240.0
