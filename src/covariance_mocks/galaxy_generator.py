@@ -9,6 +9,7 @@ Coordinates galaxy population using rgrspit_diffsky with batch processing.
 
 from jax import random as jran
 from . import CURRENT_Z_OBS, LGMP_MIN
+from .emission_lines import add_emission_lines
 
 
 def generate_galaxies(logmhost, halo_radius, halo_pos, halo_vel, Lbox, rank=0):
@@ -69,5 +70,9 @@ def generate_galaxies(logmhost, halo_radius, halo_pos, halo_vel, Lbox, rank=0):
     )
     
     print(f"Rank {rank}: generated mock with {len(galcat['pos'])} galaxies from {len(logmhost)} halos")
+    
+    # Add emission line luminosities
+    galcat = add_emission_lines(galcat)
+    print(f"Rank {rank}: added emission line luminosities (OII and H-alpha)")
     
     return galcat
