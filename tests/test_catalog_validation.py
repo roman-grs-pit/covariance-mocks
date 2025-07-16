@@ -241,5 +241,46 @@ class TestCatalogContent:
             if np.issubdtype(data.dtype, np.floating):
                 assert np.all(np.isfinite(data)), f"Non-finite values found in {name}"
                 assert data.size > 0, f"Empty dataset: {name}"
+    
+    @pytest.mark.system 
+    @pytest.mark.skipif(not HDF5_AVAILABLE, reason="h5py not available")
+    def test_emission_line_properties_present(self, shared_catalog):
+        """Test that emission line properties are present in generated catalog."""
+        if not shared_catalog.catalog_path.exists():
+            pytest.skip(f"Catalog not found: {shared_catalog.catalog_path}")
+        
+        catalog_data = load_hdf5_datasets(shared_catalog.catalog_path)
+        
+        # Check that emission line datasets exist
+        required_emission_datasets = ['galaxies/l_oii', 'galaxies/l_halpha']
+        found_datasets = list(catalog_data.keys())
+        
+        for dataset_name in required_emission_datasets:
+            assert dataset_name in found_datasets, f"Missing emission line dataset: {dataset_name}. Available: {found_datasets}"
+        
+        # Check that emission line data has reasonable properties
+        l_oii = catalog_data['galaxies/l_oii']
+        l_halpha = catalog_data['galaxies/l_halpha']
+        
+        # Check shapes match number of galaxies
+        n_galaxies = len(catalog_data['galaxies/pos'])
+        assert l_oii.shape == (n_galaxies,), f"OII luminosity shape mismatch: {l_oii.shape} vs expected ({n_galaxies},)"
+        assert l_halpha.shape == (n_galaxies,), f"H-alpha luminosity shape mismatch: {l_halpha.shape} vs expected ({n_galaxies},)"
+        
+        # Check values are positive (luminosities should be positive)
+        assert np.all(l_oii >= 0), "Found negative OII luminosities"
+        assert np.all(l_halpha >= 0), "Found negative H-alpha luminosities" 
+        
+        # Check values are finite
+        assert np.all(np.isfinite(l_oii)), "Found non-finite values in OII luminosities"
+        assert np.all(np.isfinite(l_halpha)), "Found non-finite values in H-alpha luminosities"
+        
+        # Check that luminosities are reasonable (not all zero)
+        assert np.any(l_oii > 0), "All OII luminosities are zero"
+        assert np.any(l_halpha > 0), "All H-alpha luminosities are zero"
+        
+        print(f"Emission line validation passed:")
+        print(f"  OII luminosities: min={l_oii.min():.2e}, max={l_oii.max():.2e}, mean={l_oii.mean():.2e}")
+        print(f"  H-alpha luminosities: min={l_halpha.min():.2e}, max={l_halpha.max():.2e}, mean={l_halpha.mean():.2e}")
 
 
