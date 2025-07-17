@@ -35,14 +35,18 @@ Key Features
 **Three-Stage Workflow**
   Init → Stage → Submit architecture with script inspection capability
 
+**Automatic Git Tagging**
+  Creates reproducible tags for every production with rich metadata
+
 Three-Stage Workflow
 ---------------------
 
 The production system implements a three-stage workflow for better control and transparency:
 
 **Stage 1: INIT**
-  - Creates production directory structure under ``/productions/{version}_{name}/``
+  - Creates production directory structure under ``/productions/{name}/``
   - Validates configuration against schema
+  - **Creates automatic git tag** for reproducibility tracking
   - Initializes SQLite job tracking database
   - Sets up organized subdirectories (catalogs/, logs/, metadata/, qa/)
 
@@ -63,6 +67,7 @@ The production system implements a three-stage workflow for better control and t
   - **Safety**: Validate configuration and resource requirements first
   - **Control**: Separate script generation from job submission
   - **Organization**: Clean directory structure without redundant naming
+  - **Reproducibility**: Automatic git tagging ensures scientific traceability
 
 Configuration System
 --------------------
@@ -176,6 +181,9 @@ The production system uses a **three-stage workflow** with name-based lookup:
 
    # Quick status check
    production-manager status test_basic --verbose
+   
+   # Development with uncommitted changes
+   production-manager init test_basic --allow-dirty
 
 Production Workflow
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -183,43 +191,44 @@ Production Workflow
 .. code-block:: bash
 
    # 1. Initialize production using name-based lookup
-   production-manager init v1.0_covariance_v1
+   production-manager init alpha
 
    # 2. Generate SLURM scripts for inspection (optional)
-   production-manager stage v1.0_covariance_v1
+   production-manager stage alpha
 
    # 3. Submit jobs to SLURM
-   production-manager submit v1.0_covariance_v1
+   production-manager submit alpha
 
    # 4. Monitor production in real-time with path display
-   production-manager monitor v1.0_covariance_v1
+   production-manager monitor alpha
 
    # 5. Handle failures (in separate terminal)
-   production-manager retry v1.0_covariance_v1
+   production-manager retry alpha
+   
+   # Development workflow with version control
+   production-manager init alpha --version v2.0 --allow-dirty
 
 CLI Features
 ~~~~~~~~~~~~
 
 **Name-based Production Management:**
-  Use production identifiers like ``v1.0_alpha`` instead of config file paths
+  Use production names like ``alpha`` instead of config file paths
 
 **Registry System:**
-  Automatic mapping of production names to configuration files in ``config/examples/``
+  Automatic mapping of production names to configuration files in ``config/productions/``
 
 **Live Monitoring:**
   Real-time status updates with production path display for easy log access
 
 **Production Identifiers:**
-  Uses ``{version}_{name}`` pattern matching directory structure (e.g., ``v1.0_alpha``)
+  Uses production names directly matching directory structure (e.g., ``alpha``)
 
 .. code-block:: bash
 
    # Available productions shown with mappings
    production-manager list
    # Output:
-   # alpha                -> config/examples/alpha_production.yaml
-   # v1.0_alpha           -> config/examples/alpha_production.yaml
-   # v1.0_covariance_v1   -> config/examples/production.yaml
+   # alpha                -> config/productions/alpha.yaml
 
 Production Management API
 ------------------------
@@ -231,7 +240,7 @@ The production system can also be used programmatically:
    from covariance_mocks.production_manager import ProductionManager
 
    # Initialize production manager
-   manager = ProductionManager("config/examples/production.yaml", machine="nersc")
+   manager = ProductionManager("config/productions/alpha.yaml", machine="nersc")
 
    # Create all job specifications
    jobs_created = manager.initialize_production()
@@ -256,7 +265,7 @@ Productions create a structured output directory hierarchy:
 
 .. code-block:: text
 
-   productions/v1.0_covariance_v1/
+   productions/alpha/
    ├── catalogs/           # Generated mock catalogs
    │   ├── r0000/
    │   │   ├── mock_z0.500.hdf5
@@ -304,6 +313,81 @@ The production system uses SQLite for persistent job tracking:
   * Output file validation for completion confirmation
   * Production-wide statistics and success rates
 
+Git Tagging for Scientific Reproducibility
+------------------------------------------
+
+The production system automatically creates git tags for every production to ensure scientific reproducibility and traceability.
+
+Automatic Tagging Workflow
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When you run ``production-manager init``, the system:
+
+1. **Checks working tree status** - Ensures reproducible state
+2. **Creates production tag** - Format: ``production/{name}_{version}_{timestamp}``
+3. **Records metadata** - Includes config hash, file lists, and environment info
+4. **Validates reproducibility** - Warns about uncommitted changes
+
+.. code-block:: bash
+
+   # Clean working tree (recommended for production)
+   production-manager init alpha
+   # Creates tag: production/alpha_v1.0_20250717_143022
+
+   # Development with uncommitted changes
+   production-manager init alpha --allow-dirty
+   # Creates tag: production/alpha_v1.0_allow_dirty_20250717_143022
+
+Tag Format and Metadata
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Tag Format**: ``production/{name}_{version}_{timestamp}``
+
+- ``name``: Production name from config
+- ``version``: Version from config or CLI ``--version`` flag  
+- ``timestamp``: Creation time (YYYYMMDD_HHMMSS)
+
+**Tag Metadata Includes**:
+
+- Production configuration hash
+- Working tree status (clean/dirty)
+- List of modified/untracked files
+- Environment and dependency information
+- Reproducibility warnings if applicable
+
+Version Management
+~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: bash
+
+   # Specify version explicitly
+   production-manager init alpha --version v2.0
+
+   # Use config version (default)
+   production-manager init alpha  # Uses version from config file
+
+   # Runtime version overrides config version
+   production-manager init alpha --version v1.5  # Overrides config
+
+Best Practices for Scientific Reproducibility
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**For Production Runs:**
+  - Always use clean working tree (no ``--allow-dirty``)
+  - Commit all changes before running productions
+  - Use semantic versioning for production configs
+  - Document production purpose in git commit messages
+
+**For Development/Testing:**
+  - Use ``--allow-dirty`` flag for development iterations
+  - Clean up development tags before merging branches
+  - Test with clean working tree before production runs
+
+**Tag Management:**
+  - Clean up development tags: ``git tag -d production/alpha_v1.0_allow_dirty_test_*``
+  - List production tags: ``git tag -l "production/*"``
+  - View tag metadata: ``git show production/alpha_v1.0_20250717_143022``
+
 Best Practices
 --------------
 
@@ -312,12 +396,14 @@ Best Practices
   2. Validate configuration and resource requirements
   3. Test failure recovery mechanisms
   4. Scale to production once validated
+  5. **Use clean working tree for production runs**
 
 **Productions**
   1. Use hierarchical output organization
   2. Set appropriate timeout values for job complexity
   3. Configure retry policies for expected failure rates
   4. Monitor productions regularly during execution
+  5. **Document production purpose in git commits**
 
 **Resource Management**
   1. Use declarative job types rather than explicit resource specs
@@ -325,15 +411,22 @@ Best Practices
   3. Consider SLURM array size limits (typically ~1000 jobs)
   4. Balance batch size with queue wait times
 
+**Reproducibility Management**
+  1. **Commit all changes before production runs**
+  2. Use semantic versioning for production configs
+  3. Clean up development tags before merging branches
+  4. Document production purpose and methodology
+
 **Debugging and Troubleshooting**
   1. Check SLURM logs in the production logs/ directory
   2. Use production database for detailed job history
   3. Validate configuration files before large productions
   4. Test retry mechanisms with intentionally failing jobs
+  5. **Check git tag metadata for production traceability**
 
 Configuration Reference
 -----------------------
 
-For complete configuration schema documentation, see the schema file at ``config/schemas/production_schema.yaml``. Example configurations are available in ``config/examples/``.
+For complete configuration schema documentation, see the schema file at ``config/schemas/production_schema.yaml``. Active production configurations are in ``config/productions/`` and templates are available in ``config/examples/``.
 
 The production management system integrates seamlessly with the existing pipeline infrastructure while providing the scalability and reliability required for large-scale covariance mock generation.

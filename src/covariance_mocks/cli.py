@@ -79,8 +79,8 @@ Examples:
   production-manager status alpha --version v2.0
 
   # Or use full config path
-  production-manager status config/examples/alpha.yaml
-  production-manager monitor config/examples/alpha.yaml --verbose
+  production-manager status config/productions/alpha.yaml
+  production-manager monitor config/productions/alpha.yaml --verbose
         """
     )
     

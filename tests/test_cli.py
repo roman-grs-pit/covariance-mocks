@@ -24,8 +24,8 @@ class TestListProductions:
         # Mock registry
         mock_registry = Mock()
         mock_registry.list_productions.return_value = {
-            'alpha': Path('config/examples/alpha_production.yaml'),
-            'test_basic': Path('config/examples/test_basic.yaml')
+            'alpha': Path('config/productions/alpha.yaml'),
+            'test_basic': Path('config/productions/test_basic.yaml')
         }
         mock_get_registry.return_value = mock_registry
         
@@ -38,7 +38,7 @@ class TestListProductions:
         assert "Available productions:" in output
         assert "alpha" in output
         assert "test_basic" in output
-        assert "config/examples/alpha_production.yaml" in output
+        assert "config/productions/alpha.yaml" in output
     
     @pytest.mark.unit
     @patch('covariance_mocks.cli.get_registry')
@@ -77,7 +77,7 @@ class TestConfigResolutionWrapper:
     def test_config_resolution_success(self, mock_resolve_config):
         """Test successful config resolution."""
         # Mock resolve_config
-        mock_resolve_config.return_value = Path('config/examples/alpha_production.yaml')
+        mock_resolve_config.return_value = Path('config/productions/alpha.yaml')
         
         # Mock wrapped function
         mock_func = Mock(return_value=0)
@@ -92,7 +92,7 @@ class TestConfigResolutionWrapper:
         assert result == 0
         mock_resolve_config.assert_called_once_with('alpha')
         mock_func.assert_called_once_with(args)
-        assert args.config == Path('config/examples/alpha_production.yaml')
+        assert args.config == Path('config/productions/alpha.yaml')
     
     @pytest.mark.unit
     @patch('covariance_mocks.cli.resolve_config')

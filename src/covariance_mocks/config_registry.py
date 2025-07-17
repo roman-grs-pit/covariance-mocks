@@ -30,12 +30,12 @@ class ConfigRegistry:
         """Scan config directory for production files and build name mapping."""
         self._registry.clear()
         
-        # Look for config files in examples directory
-        examples_dir = self.config_dir / "examples"
-        if not examples_dir.exists():
+        # Look for config files in productions directory
+        productions_dir = self.config_dir / "productions"
+        if not productions_dir.exists():
             return
             
-        for config_file in examples_dir.glob("*.yaml"):
+        for config_file in productions_dir.glob("*.yaml"):
             try:
                 # Load just the production section to get name
                 with open(config_file, 'r') as f:

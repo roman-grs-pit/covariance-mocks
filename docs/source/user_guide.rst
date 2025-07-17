@@ -140,7 +140,7 @@ Three-Stage Workflow
 .. code-block:: bash
 
    # Create production structure and validate configuration
-   python scripts/run_production.py init alpha config/examples/alpha_production.yaml
+   python scripts/run_production.py init alpha config/productions/alpha.yaml
 
 This creates the production directory structure:
 

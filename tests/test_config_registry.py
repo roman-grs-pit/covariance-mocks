@@ -64,8 +64,8 @@ class TestConfigRegistry:
         mock_exists.return_value = True
         
         # Mock config files
-        config_file1 = Path("/tmp/config/examples/alpha.yaml")
-        config_file2 = Path("/tmp/config/examples/beta.yaml")
+        config_file1 = Path("/tmp/config/productions/alpha.yaml")
+        config_file2 = Path("/tmp/config/productions/beta.yaml")
         mock_glob.return_value = [config_file1, config_file2]
         
         # Mock YAML content
@@ -92,7 +92,7 @@ class TestConfigRegistry:
         """Test scanning with invalid configuration files."""
         mock_exists.return_value = True
         
-        config_file = Path("/tmp/config/examples/invalid.yaml")
+        config_file = Path("/tmp/config/productions/invalid.yaml")
         mock_glob.return_value = [config_file]
         
         # Mock YAML errors
@@ -112,7 +112,7 @@ class TestConfigRegistry:
         """Test scanning files with missing required fields."""
         mock_exists.return_value = True
         
-        config_file = Path("/tmp/config/examples/incomplete.yaml")
+        config_file = Path("/tmp/config/productions/incomplete.yaml")
         mock_glob.return_value = [config_file]
         
         # Mock config with missing production name (only field required now)
@@ -147,7 +147,7 @@ class TestConfigRegistry:
     def test_get_config_path_production_name(self):
         """Test resolving production name."""
         registry = ConfigRegistry(Path("/tmp"))
-        config_path = Path("/tmp/config/examples/alpha.yaml")
+        config_path = Path("/tmp/config/productions/alpha.yaml")
         registry._registry["alpha"] = config_path
         
         result = registry.get_config_path("alpha")
@@ -255,8 +255,8 @@ class TestConfigRegistryEdgeCases:
         """Test handling of name conflicts (last file wins)."""
         mock_exists.return_value = True
         
-        config_file1 = Path("/tmp/config/examples/alpha_v1.yaml")
-        config_file2 = Path("/tmp/config/examples/alpha_v2.yaml")
+        config_file1 = Path("/tmp/config/productions/alpha_v1.yaml")
+        config_file2 = Path("/tmp/config/productions/alpha_v2.yaml")
         mock_glob.return_value = [config_file1, config_file2]
         
         # Both have same name (versions no longer create separate identifiers)
@@ -280,7 +280,7 @@ class TestConfigRegistryEdgeCases:
         """Test handling of I/O errors during file reading."""
         mock_exists.return_value = True
         
-        config_file = Path("/tmp/config/examples/unreadable.yaml")
+        config_file = Path("/tmp/config/productions/unreadable.yaml")
         mock_glob.return_value = [config_file]
         
         # Should not raise exception, just skip the file

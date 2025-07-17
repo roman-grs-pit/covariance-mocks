@@ -25,18 +25,38 @@ Generate a single mock galaxy catalog for the Roman Galaxy Redshift Survey on Pe
    # Run single mock generation (Roman GRS PIT account)
    python scripts/generate_single_mock.py nersc /path/to/output/directory
 
-For large-scale campaigns with thousands of jobs, use the campaign management system:
+For large-scale productions with thousands of jobs, use the production management system:
 
 .. code-block:: bash
 
-   # Initialize campaign configuration
-   python scripts/run_campaign.py init my_campaign config/examples/production_campaign.yaml
+   # Install CLI tool (one-time setup)
+   pip install -e .
    
-   # Submit campaign jobs to SLURM
-   python scripts/run_campaign.py submit my_campaign
+   # List available productions
+   production-manager list
    
-   # Monitor campaign progress  
-   python scripts/run_campaign.py status my_campaign
+   # Initialize production
+   production-manager init alpha
+   
+   # Submit production jobs to SLURM
+   production-manager submit alpha
+   
+   # Monitor production progress  
+   production-manager monitor alpha
+
+**Configuration Workflow:**
+
+1. **Copy template**: ``cp config/examples/covariance_template.yaml config/productions/my_production.yaml``
+2. **Edit config**: Modify production name, redshifts, and parameters
+3. **Run production**: ``production-manager init my_production``
+
+**Git Tagging for Reproducibility:**
+
+The system automatically creates git tags for every production:
+
+- **Clean working tree**: ``production-manager init alpha`` → ``production/alpha_v1.0_20250717_143022``
+- **Development mode**: ``production-manager init alpha --allow-dirty`` → ``production/alpha_v1.0_allow_dirty_20250717_143022``
+- **Version control**: ``production-manager init alpha --version v2.0`` → ``production/alpha_v2.0_20250717_143022``
 
 The single mock generation script will:
 
@@ -45,13 +65,13 @@ The single mock generation script will:
 3. Generate galaxies using rgrspit_diffsky
 4. Write results to HDF5 format
 
-The campaign management system will:
+The production management system will:
 
-1. Parse YAML configuration files
+1. Parse YAML configuration files from ``config/productions/``
 2. Create SQLite database for job tracking
 3. Submit SLURM array jobs with specified parameters
 4. Monitor job progress and handle failures
-5. Organize output files by campaign version
+5. Organize output files by production name
 
 Testing
 -------

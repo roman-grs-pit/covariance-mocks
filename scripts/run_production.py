@@ -235,22 +235,22 @@ def main():
         epilog="""
 Examples:
   # Initialize a new production
-  python run_production.py init config/examples/test_production.yaml
+  python run_production.py init config/productions/test_production.yaml
 
   # Stage pending jobs (create scripts)
-  python run_production.py stage config/examples/test_production.yaml
+  python run_production.py stage config/productions/test_production.yaml
 
   # Submit staged jobs to SLURM
-  python run_production.py submit config/examples/test_production.yaml
+  python run_production.py submit config/productions/test_production.yaml
 
   # Check production status
-  python run_production.py status config/examples/test_production.yaml --verbose
+  python run_production.py status config/productions/test_production.yaml --verbose
 
   # Retry failed jobs and submit immediately
-  python run_production.py retry config/examples/test_production.yaml --submit
+  python run_production.py retry config/productions/test_production.yaml --submit
 
   # Monitor production progress
-  python run_production.py monitor config/examples/test_production.yaml --interval 30
+  python run_production.py monitor config/productions/test_production.yaml --interval 30
         """
     )
     

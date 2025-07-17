@@ -68,7 +68,7 @@ from covariance_mocks.production_config import ProductionConfig
 from covariance_mocks.production_manager import ProductionManager
 
 # Load and validate production configuration
-config = ProductionConfig.from_yaml('config/examples/production_template.yaml')
+config = ProductionConfig.from_yaml('config/productions/alpha.yaml')
 
 # Initialize production manager
 manager = ProductionManager(config)
