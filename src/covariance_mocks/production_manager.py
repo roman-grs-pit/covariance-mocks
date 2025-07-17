@@ -271,7 +271,7 @@ class ProductionManager:
         if work_dir is None:
             production_name = self.config["production"]["name"]
             base_path = Path(self.config["outputs"]["base_path"])
-            work_dir = base_path / "productions" / f"{self.production_version}_{production_name}"
+            work_dir = base_path / "productions" / f"{production_name}_{self.production_version}"
         
         self.work_dir = Path(work_dir)
         self.work_dir.mkdir(parents=True, exist_ok=True)
@@ -1005,8 +1005,12 @@ exit $EXIT_CODE
         completed = stats.get("completed", 0)
         failed = stats.get("failed", 0)
         
+        # Create production info with resolved version
+        production_info = self.config["production"].copy()
+        production_info["version"] = self.production_version
+        
         summary = {
-            "production": self.config["production"],
+            "production": production_info,
             "work_dir": str(self.work_dir),
             "statistics": {
                 "total_jobs": total_jobs,

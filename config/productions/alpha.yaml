@@ -1,9 +1,9 @@
 # Alpha Production Test Configuration
-# Phase 3 production testing: 2 realizations with primary redshifts
+# Production testing: 2 realizations with primary redshifts
 
 production:
   name: "alpha"
-  description: "Alpha production test for Phase 3 deployment: 2 realizations (ph3000, ph3001) with 12 primary redshifts"
+  description: "Alpha production test for covariance mocks: 2 realizations (ph3000, ph3001) with 12 primary redshifts"
   tags: ["phase3", "alpha", "production-test", "primary-redshifts"]
 
 science:
@@ -29,17 +29,16 @@ execution:
 # GPU resources for alpha testing - override job_type defaults
 resources:
   nodes_per_job: 2
-  tasks_per_node: 64
+  tasks_per_node: 4
   memory_gb: 128.0
   gpus_per_node: 4
   constraint: "gpu"
-  partition: "gpu"
 
 outputs:
   base_path: "/global/cfs/cdirs/m4943/Simulations/covariance_mocks"
   structure: "hierarchical"
   compression: "gzip"
   cleanup_policy:
-    keep_logs_days: 14
+    keep_logs_days: 365
     keep_intermediate: true
     archive_completed: false
