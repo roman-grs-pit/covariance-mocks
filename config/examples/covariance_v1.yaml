@@ -3,7 +3,6 @@
 
 production:
   name: "covariance_v1"
-  version: "v1.0"
   description: "Production for covariance mock generation with 2000 realizations across 20 redshift snapshots"
   tags: ["production", "covariance", "abacus_summit"]
   dependencies:

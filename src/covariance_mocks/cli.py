@@ -46,6 +46,12 @@ def wrap_with_config_resolution(func):
             config_path = resolve_config(args.config)
             # Replace the config argument with resolved path
             args.config = config_path
+            
+            # Pass version information if provided
+            if hasattr(args, 'version') and args.version:
+                # Store version for use by production functions
+                args.production_version = args.version
+            
             return func(args)
         except ConfigurationError as e:
             print(f"Configuration error: {e}", file=sys.stderr)
@@ -68,9 +74,13 @@ Examples:
   production-manager monitor alpha --interval 30
   production-manager init test_basic
 
+  # Specify version at runtime
+  production-manager init alpha --version v1.2
+  production-manager status alpha --version v2.0
+
   # Or use full config path
-  production-manager status config/examples/alpha_production.yaml
-  production-manager monitor config/examples/alpha_production.yaml --verbose
+  production-manager status config/examples/alpha.yaml
+  production-manager monitor config/examples/alpha.yaml --verbose
         """
     )
     
@@ -86,6 +96,11 @@ Examples:
         help="Override work directory (default: auto-generated from config)"
     )
     
+    parser.add_argument(
+        "--version",
+        help="Specify version for production run (e.g., v1.0, v1.1, v2.0)"
+    )
+    
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
     
     # List command
@@ -95,6 +110,8 @@ Examples:
     # Initialize command
     init_parser = subparsers.add_parser("init", help="Initialize new production")
     init_parser.add_argument("config", help="Production name or configuration file path")
+    init_parser.add_argument("--allow-dirty", action="store_true", 
+                           help="Allow tagging with uncommitted changes (not recommended for production)")
     init_parser.set_defaults(func=wrap_with_config_resolution(initialize_production))
     
     # Stage command

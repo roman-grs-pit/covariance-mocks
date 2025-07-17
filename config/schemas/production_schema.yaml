@@ -3,7 +3,7 @@
 
 production:
   type: object
-  required: [name, version, description]
+  required: [name, description]
   properties:
     name:
       type: string

@@ -3,7 +3,6 @@
 
 production:
   name: "alpha"
-  version: "v1.0"
   description: "Alpha production test for Phase 3 deployment: 2 realizations (ph3000, ph3001) with 12 primary redshifts"
   tags: ["phase3", "alpha", "production-test", "primary-redshifts"]
 

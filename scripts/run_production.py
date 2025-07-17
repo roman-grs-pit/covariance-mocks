@@ -21,7 +21,9 @@ from covariance_mocks.production_config import ConfigurationError
 def initialize_production(args):
     """Initialize a new production."""
     try:
-        manager = ProductionManager(args.config, args.machine, args.work_dir)
+        version = getattr(args, 'production_version', None)
+        allow_dirty = getattr(args, 'allow_dirty', False)
+        manager = ProductionManager(args.config, args.machine, args.work_dir, dry_run=False, version=version, allow_dirty=allow_dirty)
         
         print(f"Initializing production from {args.config}")
         print(f"Machine: {args.machine}")
@@ -51,7 +53,9 @@ def initialize_production(args):
 def stage_jobs(args):
     """Stage pending jobs by creating SLURM scripts."""
     try:
-        manager = ProductionManager(args.config, args.machine, args.work_dir)
+        version = getattr(args, 'production_version', None)
+        allow_dirty = getattr(args, 'allow_dirty', False)
+        manager = ProductionManager(args.config, args.machine, args.work_dir, dry_run=False, version=version, allow_dirty=allow_dirty)
         
         print(f"Staging pending jobs for production in {manager.work_dir}")
         
@@ -83,7 +87,9 @@ def stage_jobs(args):
 def submit_jobs(args):
     """Submit staged jobs to SLURM."""
     try:
-        manager = ProductionManager(args.config, args.machine, args.work_dir)
+        version = getattr(args, 'production_version', None)
+        allow_dirty = getattr(args, 'allow_dirty', False)
+        manager = ProductionManager(args.config, args.machine, args.work_dir, dry_run=False, version=version, allow_dirty=allow_dirty)
         
         print(f"Submitting staged jobs for production in {manager.work_dir}")
         
@@ -114,7 +120,9 @@ def submit_jobs(args):
 def check_status(args):
     """Check production status."""
     try:
-        manager = ProductionManager(args.config, args.machine, args.work_dir)
+        version = getattr(args, 'production_version', None)
+        allow_dirty = getattr(args, 'allow_dirty', False)
+        manager = ProductionManager(args.config, args.machine, args.work_dir, dry_run=False, version=version, allow_dirty=allow_dirty)
         
         print(f"Checking status for production in {manager.work_dir}")
         
@@ -149,7 +157,9 @@ def check_status(args):
 def retry_failed(args):
     """Retry failed jobs."""
     try:
-        manager = ProductionManager(args.config, args.machine, args.work_dir)
+        version = getattr(args, 'production_version', None)
+        allow_dirty = getattr(args, 'allow_dirty', False)
+        manager = ProductionManager(args.config, args.machine, args.work_dir, dry_run=False, version=version, allow_dirty=allow_dirty)
         
         print(f"Retrying failed jobs for production in {manager.work_dir}")
         
@@ -176,7 +186,9 @@ def retry_failed(args):
 def monitor_production(args):
     """Monitor production progress continuously."""
     try:
-        manager = ProductionManager(args.config, args.machine, args.work_dir)
+        version = getattr(args, 'production_version', None)
+        allow_dirty = getattr(args, 'allow_dirty', False)
+        manager = ProductionManager(args.config, args.machine, args.work_dir, dry_run=False, version=version, allow_dirty=allow_dirty)
         
         print(f"Monitoring production in {manager.work_dir}")
         print(f"Update interval: {args.interval} seconds")
@@ -259,6 +271,8 @@ Examples:
     # Initialize command
     init_parser = subparsers.add_parser("init", help="Initialize new production")
     init_parser.add_argument("config", type=Path, help="Production configuration file")
+    init_parser.add_argument("--allow-dirty", action="store_true", 
+                           help="Allow tagging with uncommitted changes (not recommended for production)")
     init_parser.set_defaults(func=initialize_production)
     
     # Stage command
