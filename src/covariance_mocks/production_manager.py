@@ -9,6 +9,7 @@ import os
 import sqlite3
 import json
 import time
+import hashlib
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Iterator, Tuple
 from dataclasses import dataclass, asdict
@@ -238,7 +239,8 @@ class ProductionManager:
     """Manages production execution with batch job orchestration."""
     
     def __init__(self, production_config_path: Path, machine: str = "nersc", 
-                 work_dir: Optional[Path] = None, dry_run: bool = False):
+                 work_dir: Optional[Path] = None, dry_run: bool = False, 
+                 version: Optional[str] = None, allow_dirty: bool = False):
         """Initialize production manager.
         
         Args:
@@ -246,20 +248,30 @@ class ProductionManager:
             machine: Machine name for defaults
             work_dir: Working directory for production files (default: auto-generated)
             dry_run: If True, create scripts and directories but don't submit to SLURM
+            version: Runtime version override (e.g., 'v1.0', 'v2.1')
+            allow_dirty: If True, allow tagging with uncommitted changes
         """
         self.config_path = Path(production_config_path)
         self.machine = machine
+        self.dry_run = dry_run
+        self.allow_dirty = allow_dirty
         
         # Load and validate configuration
         self.config_loader = ProductionConfigLoader()
         self.config = self.config_loader.load_production_config(production_config_path, machine)
         
+        # Handle runtime version (CLI override or config default or fallback)
+        self.production_version = (
+            version or 
+            self.config.get("production", {}).get("version") or 
+            "v1.0"
+        )
+        
         # Set up working directory
         if work_dir is None:
             production_name = self.config["production"]["name"]
-            production_version = self.config["production"]["version"]
             base_path = Path(self.config["outputs"]["base_path"])
-            work_dir = base_path / "productions" / f"{production_version}_{production_name}"
+            work_dir = base_path / "productions" / f"{self.production_version}_{production_name}"
         
         self.work_dir = Path(work_dir)
         self.work_dir.mkdir(parents=True, exist_ok=True)
@@ -285,6 +297,10 @@ class ProductionManager:
         
         # Log dependency version information
         self._log_dependency_versions()
+        
+        # Create git tag for this production (unless dry run)
+        if not dry_run:
+            self._create_production_tag()
     
     def _log_dependency_versions(self):
         """Log dependency version information for reproducibility."""
@@ -295,7 +311,7 @@ class ProductionManager:
         
         # Log to metadata file
         version_info = {
-            "production_version": self.config["production"]["version"],
+            "production_version": self.production_version,
             "dependencies": dependencies,
             "initialized_at": datetime.utcnow().isoformat()
         }
@@ -304,6 +320,238 @@ class ProductionManager:
         version_file = self.metadata_dir / "version_info.json"
         with open(version_file, 'w') as f:
             json.dump(version_info, f, indent=2)
+    
+    def _check_working_tree_status(self):
+        """Check git working tree status and return detailed status information.
+        
+        Returns:
+            Dict with status information:
+            - is_clean: bool, True if working tree is clean
+            - modified_files: List of modified files
+            - staged_files: List of staged files
+            - untracked_files: List of untracked files
+            - status_summary: String summary of status
+        """
+        try:
+            # Get git status in porcelain format
+            result = subprocess.run(
+                ["git", "status", "--porcelain"],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            
+            status_lines = result.stdout.strip().split('\n') if result.stdout.strip() else []
+            
+            modified_files = []
+            staged_files = []
+            untracked_files = []
+            
+            for line in status_lines:
+                if len(line) < 3:
+                    continue
+                    
+                status_code = line[:2]
+                filename = line[3:]
+                
+                # Parse git status codes
+                if status_code[0] in ['M', 'A', 'D', 'R', 'C']:  # Staged changes
+                    staged_files.append(filename)
+                if status_code[1] in ['M', 'D']:  # Modified in working tree
+                    modified_files.append(filename)
+                if status_code == '??':  # Untracked
+                    untracked_files.append(filename)
+            
+            is_clean = not (modified_files or staged_files or untracked_files)
+            
+            # Generate status summary
+            if is_clean:
+                status_summary = "Working tree clean"
+            else:
+                parts = []
+                if staged_files:
+                    parts.append(f"{len(staged_files)} staged")
+                if modified_files:
+                    parts.append(f"{len(modified_files)} modified")
+                if untracked_files:
+                    parts.append(f"{len(untracked_files)} untracked")
+                status_summary = f"Working tree dirty: {', '.join(parts)} files"
+            
+            return {
+                'is_clean': is_clean,
+                'modified_files': modified_files,
+                'staged_files': staged_files,
+                'untracked_files': untracked_files,
+                'status_summary': status_summary
+            }
+            
+        except subprocess.CalledProcessError:
+            # If git status fails, assume we're not in a repo or other issue
+            return {
+                'is_clean': True,  # Default to clean if we can't determine status
+                'modified_files': [],
+                'staged_files': [],
+                'untracked_files': [],
+                'status_summary': "Git status unavailable"
+            }
+    
+    def _create_production_tag(self):
+        """Create a git tag for this production initialization."""
+        try:
+            # Check if we're in a git repository
+            result = subprocess.run(
+                ["git", "rev-parse", "--git-dir"],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+        except subprocess.CalledProcessError:
+            print("Warning: Not in a git repository, skipping tag creation")
+            return
+        
+        # Check working tree status
+        git_status = self._check_working_tree_status()
+        
+        # Handle dirty working tree based on policy
+        if not git_status['is_clean']:
+            if not self.allow_dirty:
+                print(f"ERROR: {git_status['status_summary']}")
+                print("Production tagging requires a clean working tree for reproducibility.")
+                print("Options:")
+                print("  1. Commit or stash your changes")
+                print("  2. Use --allow-dirty flag to force tagging with dirty tree")
+                print("Skipping tag creation.")
+                return
+            else:
+                print(f"WARNING: {git_status['status_summary']}")
+                print("Creating tag with dirty working tree - reproducibility may be compromised!")
+        
+        # Generate tag components
+        production_name = self.config["production"]["name"]
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        
+        # Create base tag name
+        base_tag = f"production/{production_name}_{self.production_version}_{timestamp}"
+        tag_name = base_tag
+        
+        # Check for tag conflicts and handle them
+        counter = 1
+        while self._tag_exists(tag_name):
+            tag_name = f"{base_tag}_{counter:02d}"
+            counter += 1
+            if counter > 99:  # Safety limit
+                print(f"Warning: Too many tag conflicts for {base_tag}, skipping tag creation")
+                return
+        
+        # Create tag message with production metadata
+        tag_message = self._generate_tag_message(git_status)
+        
+        try:
+            # Create the git tag
+            subprocess.run(
+                ["git", "tag", "-a", tag_name, "-m", tag_message],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            print(f"Created git tag: {tag_name}")
+            
+            # Save tag name to metadata
+            tag_file = self.metadata_dir / "git_tag.txt"
+            with open(tag_file, 'w') as f:
+                f.write(tag_name)
+                
+        except subprocess.CalledProcessError as e:
+            print(f"Warning: Failed to create git tag {tag_name}: {e.stderr}")
+    
+    def _tag_exists(self, tag_name: str) -> bool:
+        """Check if a git tag already exists."""
+        try:
+            subprocess.run(
+                ["git", "rev-parse", "--verify", f"refs/tags/{tag_name}"],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            return True
+        except subprocess.CalledProcessError:
+            return False
+    
+    def _generate_tag_message(self, git_status: Dict[str, Any]) -> str:
+        """Generate a comprehensive tag message with production metadata."""
+        production = self.config["production"]
+        science = self.config["science"]
+        
+        # Calculate config file hash for reproducibility
+        config_hash = self._calculate_config_hash()
+        
+        # Get current git commit
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            commit_hash = result.stdout.strip()[:8]
+        except subprocess.CalledProcessError:
+            commit_hash = "unknown"
+        
+        # Build working tree status section
+        if not git_status['is_clean']:
+            dirty_details = []
+            if git_status['staged_files']:
+                dirty_details.append(f"  Staged files ({len(git_status['staged_files'])}): {', '.join(git_status['staged_files'][:5])}")
+                if len(git_status['staged_files']) > 5:
+                    dirty_details.append(f"    ... and {len(git_status['staged_files']) - 5} more")
+            if git_status['modified_files']:
+                dirty_details.append(f"  Modified files ({len(git_status['modified_files'])}): {', '.join(git_status['modified_files'][:5])}")
+                if len(git_status['modified_files']) > 5:
+                    dirty_details.append(f"    ... and {len(git_status['modified_files']) - 5} more")
+            if git_status['untracked_files']:
+                # Filter out common development files
+                relevant_untracked = [f for f in git_status['untracked_files'] 
+                                     if not f.startswith('.') and not f.endswith(('.log', '.tmp', '.pyc'))]
+                if relevant_untracked:
+                    dirty_details.append(f"  Untracked files ({len(relevant_untracked)}): {', '.join(relevant_untracked[:5])}")
+                    if len(relevant_untracked) > 5:
+                        dirty_details.append(f"    ... and {len(relevant_untracked) - 5} more")
+            
+            working_tree_section = f"\nWORKING TREE STATUS: {git_status['status_summary']}\n" + "\n".join(dirty_details)
+            if not git_status['is_clean']:
+                working_tree_section += "\nWARNING: This production was created with uncommitted changes!"
+                working_tree_section += "\nReproducibility may be compromised. Ensure changes are committed for exact reproduction."
+        else:
+            working_tree_section = f"\nWORKING TREE STATUS: {git_status['status_summary']}"
+
+        message = f"""Production: {production['name']} {self.production_version}
+
+Description: {production.get('description', 'No description provided')}
+
+Configuration:
+- Redshifts: {len(science['redshifts'])} values ({min(science['redshifts']):.3f} to {max(science['redshifts']):.3f})
+- Realizations: {science['realizations']['count']} ({science['realizations']['start']} to {science['realizations']['start'] + science['realizations']['count'] - 1})
+- Total jobs: {len(science['redshifts']) * science['realizations']['count']}
+{working_tree_section}
+
+Technical details:
+- Config file: {self.config_path.name}
+- Config hash: {config_hash}
+- Machine: {self.machine}
+- Git commit: {commit_hash}
+- Initialized: {datetime.utcnow().isoformat()}Z
+- Work directory: {self.work_dir}"""
+        
+        return message
+    
+    def _calculate_config_hash(self) -> str:
+        """Calculate SHA256 hash of the configuration file for reproducibility."""
+        try:
+            with open(self.config_path, 'rb') as f:
+                content = f.read()
+            return hashlib.sha256(content).hexdigest()[:12]
+        except Exception:
+            return "unknown"
     
     def initialize_production(self) -> int:
         """Initialize production by creating all job specifications.
@@ -495,9 +743,11 @@ class ProductionManager:
 #SBATCH --constraint={resources["constraint"]}
 #SBATCH --nodes={resources["nodes_per_job"]}
 #SBATCH --ntasks-per-node={resources["tasks_per_node"]}
-#SBATCH --cpus-per-task={resources["cpus_per_task"]}
-#SBATCH --gpus-per-node={resources["gpus_per_node"]}
-#SBATCH --exclusive
+#SBATCH --cpus-per-task={resources["cpus_per_task"]}"""
+            # Only add GPU directive if GPUs are configured
+            if "gpus_per_node" in resources and resources["gpus_per_node"] > 0:
+                script_content += f"\n#SBATCH --gpus-per-node={resources['gpus_per_node']}"
+            script_content += f"""
 #SBATCH --time={int(execution["timeout_hours"] * 60):02d}:00
 #SBATCH --output={self.logs_dir}/{batch.batch_id}.out
 #SBATCH --error={self.logs_dir}/{batch.batch_id}.err
@@ -527,9 +777,11 @@ exit $EXIT_CODE
 #SBATCH --constraint={resources["constraint"]}
 #SBATCH --nodes={resources["nodes_per_job"]}
 #SBATCH --ntasks-per-node={resources["tasks_per_node"]}
-#SBATCH --cpus-per-task={resources["cpus_per_task"]}
-#SBATCH --gpus-per-node={resources["gpus_per_node"]}
-#SBATCH --exclusive
+#SBATCH --cpus-per-task={resources["cpus_per_task"]}"""
+            # Only add GPU directive if GPUs are configured
+            if "gpus_per_node" in resources and resources["gpus_per_node"] > 0:
+                script_content += f"\n#SBATCH --gpus-per-node={resources['gpus_per_node']}"
+            script_content += f"""
 #SBATCH --time={int(execution["timeout_hours"] * 60):02d}:00
 #SBATCH --array=0-{len(jobs)-1}
 #SBATCH --output={self.logs_dir}/{batch.batch_id}_%a.out

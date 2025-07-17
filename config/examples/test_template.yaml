@@ -3,7 +3,6 @@
 
 production:
   name: "test_basic"
-  version: "v1.0"
   description: "Basic test production with minimal resources for development validation"
   tags: ["test", "development", "validation"]
 

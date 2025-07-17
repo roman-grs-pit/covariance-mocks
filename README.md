@@ -72,34 +72,113 @@ pip install -e .
 production-manager list
 
 # Stage 1: Initialize production using name
-production-manager init v1.0_alpha
+production-manager init alpha
 
 # Stage 2: Generate and inspect SLURM scripts (optional)
-production-manager stage v1.0_alpha
+production-manager stage alpha
 
 # Stage 3: Submit jobs to SLURM
-production-manager submit v1.0_alpha
+production-manager submit alpha
 
 # Monitor progress with live updates
-production-manager monitor v1.0_alpha
+production-manager monitor alpha
 
 # Quick status check
-production-manager status v1.0_alpha
+production-manager status alpha
 
 # Retry failed jobs
-production-manager retry v1.0_alpha
+production-manager retry alpha
 ```
 
 **CLI Features:**
-- **Name-based lookup**: Use production names like `v1.0_alpha` instead of config file paths
+- **Name-based lookup**: Use production names like `alpha` instead of config file paths
 - **Live monitoring**: Real-time status updates with production path display
 - **Registry system**: Automatic mapping of production names to configurations
 - **Three-stage workflow**: Init → Stage → Submit with script inspection
+- **Automatic git tagging**: Creates reproducible tags for every production
+
+**Configuration Workflow:**
+1. **Copy template**: `cp config/examples/covariance_template.yaml config/productions/my_production.yaml`
+2. **Edit config**: Modify production name, redshifts, and parameters
+3. **Run production**: `production-manager init my_production`
 
 **Directory Structure:**
-- Productions organized as `/productions/{version}_{name}/` (e.g., `/productions/v1.0_alpha/`)
-- Clean naming matching production identifiers
+- **`config/productions/`** - Active production configurations (git-tracked)
+- **`config/examples/`** - Template configurations for creating new productions
+- Productions organized as `/productions/{name}/` (e.g., `/productions/alpha/`)
 - Separate directories for catalogs, logs, metadata, and scripts
+
+## Git Tagging for Scientific Reproducibility
+
+The production system automatically creates git tags for every production to ensure scientific reproducibility and traceability.
+
+### Automatic Tagging Workflow
+
+When you run `production-manager init`, the system:
+
+1. **Checks working tree status** - Ensures reproducible state
+2. **Creates production tag** - Format: `production/{name}_{version}_{timestamp}`
+3. **Records metadata** - Includes config hash, file lists, and environment info
+4. **Validates reproducibility** - Warns about uncommitted changes
+
+```bash
+# Clean working tree (recommended for production)
+production-manager init alpha
+# Creates tag: production/alpha_v1.0_20250717_143022
+
+# Development with uncommitted changes
+production-manager init alpha --allow-dirty
+# Creates tag: production/alpha_v1.0_allow_dirty_20250717_143022
+```
+
+### Tag Format and Metadata
+
+**Tag Format**: `production/{name}_{version}_{timestamp}`
+- `name`: Production name from config
+- `version`: Version from config or CLI `--version` flag
+- `timestamp`: Creation time (YYYYMMDD_HHMMSS)
+
+**Tag Metadata Includes**:
+- Production configuration hash
+- Working tree status (clean/dirty)
+- List of modified/untracked files
+- Environment and dependency information
+- Reproducibility warnings if applicable
+
+### Best Practices for Scientific Reproducibility
+
+**For Production Runs:**
+- Always use clean working tree (no `--allow-dirty`)
+- Commit all changes before running productions
+- Use semantic versioning for production configs
+- Document production purpose in git commit messages
+
+**For Development/Testing:**
+- Use `--allow-dirty` flag for development iterations
+- Clean up development tags before merging branches
+- Test with clean working tree before production runs
+
+**Version Management:**
+```bash
+# Specify version explicitly
+production-manager init alpha --version v2.0
+
+# Use config version (default)
+production-manager init alpha  # Uses version from config file
+```
+
+### Viewing Production Tags
+
+```bash
+# List all production tags
+git tag -l "production/*"
+
+# View tag metadata
+git show production/alpha_v1.0_20250717_143022
+
+# Clean up development tags
+git tag -d production/alpha_v1.0_allow_dirty_test_20250717_143022
+```
 
 ### Manual Pipeline Steps
 
@@ -155,7 +234,7 @@ Productions use organized directory structure:
 └── qa/                # Quality assurance outputs
 ```
 
-**Example**: Alpha production (`v1.0_alpha`) creates `/productions/v1.0_alpha/` with organized structure.
+**Example**: Alpha production (`alpha`) creates `/productions/alpha/` with organized structure.
 
 ### Example Output Visualization
 

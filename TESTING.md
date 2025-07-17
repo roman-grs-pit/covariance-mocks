@@ -118,8 +118,7 @@ production-manager list
 production-manager status --help
 
 # Test name resolution
-production-manager status v1.0_alpha
-production-manager status alpha  # Backwards compatibility
+production-manager status alpha
 ```
 
 ### Production Workflow Testing
@@ -130,6 +129,27 @@ production-manager stage test_basic    # Should create batch scripts
 production-manager status test_basic   # Should show staged jobs
 production-manager submit test_basic   # Should submit to SLURM
 production-manager monitor test_basic  # Should show live updates
+```
+
+### Git Tagging Workflow Testing
+```bash
+# Test clean working tree tagging
+git status  # Should be clean
+production-manager init test_basic
+git tag -l "production/*"  # Should show new tag
+
+# Test development workflow with --allow-dirty
+echo "test" > temp_file
+production-manager init test_basic --allow-dirty
+git tag -l "production/*"  # Should show tag with 'allow_dirty' marker
+
+# Test version specification
+production-manager init test_basic --version v2.0
+git tag -l "production/*"  # Should show tag with v2.0
+
+# Clean up test tags
+git tag -d $(git tag -l "production/test_basic*")
+rm -f temp_file
 ```
 
 ## Common Testing Commands
@@ -168,6 +188,7 @@ nohup pytest -v --timeout=1800 > full_tests.log 2>&1 &
 - **During development**: `pytest -m unit -v` (< 1 minute)
 - **Pre-commit**: `pytest -m "unit or (system and not slow)" -v` (< 5 minutes)
 - **CLI testing**: `production-manager list && production-manager status test_basic` (< 30 seconds)
+- **Git tagging**: Test clean/dirty workflows with `production-manager init test_basic --allow-dirty`
 
 ### Validation Testing
 - **Before releases**: Run validation tests in background

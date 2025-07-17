@@ -30,30 +30,23 @@ class ConfigRegistry:
         """Scan config directory for production files and build name mapping."""
         self._registry.clear()
         
-        # Look for config files in examples directory
-        examples_dir = self.config_dir / "examples"
-        if not examples_dir.exists():
+        # Look for config files in productions directory
+        productions_dir = self.config_dir / "productions"
+        if not productions_dir.exists():
             return
             
-        for config_file in examples_dir.glob("*.yaml"):
+        for config_file in productions_dir.glob("*.yaml"):
             try:
-                # Load just the production section to get name and version
+                # Load just the production section to get name
                 with open(config_file, 'r') as f:
                     config = yaml.safe_load(f)
                 
                 production = config.get('production', {})
-                if 'name' in production and 'version' in production:
+                if 'name' in production:
                     name = production['name']
-                    version = production['version']
                     
-                    # Create {version}_{name} identifier
-                    production_id = f"{version}_{name}"
-                    self._registry[production_id] = config_file
-                    
-                    # Also register just the name for backwards compatibility
-                    # (but {version}_{name} takes precedence if there are conflicts)
-                    if name not in self._registry:
-                        self._registry[name] = config_file
+                    # Register only the production name (no version-based identifiers)
+                    self._registry[name] = config_file
                     
             except (yaml.YAMLError, IOError, KeyError) as e:
                 # Skip files that can't be parsed or don't have required fields
