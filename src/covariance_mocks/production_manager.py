@@ -362,20 +362,22 @@ class ProductionManager:
                 if status_code == '??':  # Untracked
                     untracked_files.append(filename)
             
-            is_clean = not (modified_files or staged_files or untracked_files)
+            is_clean = not (modified_files or staged_files)
             
             # Generate status summary
             if is_clean:
                 status_summary = "Working tree clean"
+                if untracked_files:
+                    status_summary += f" ({len(untracked_files)} untracked files)"
             else:
                 parts = []
                 if staged_files:
                     parts.append(f"{len(staged_files)} staged")
                 if modified_files:
                     parts.append(f"{len(modified_files)} modified")
-                if untracked_files:
-                    parts.append(f"{len(untracked_files)} untracked")
                 status_summary = f"Working tree dirty: {', '.join(parts)} files"
+                if untracked_files:
+                    status_summary += f" ({len(untracked_files)} untracked)"
             
             return {
                 'is_clean': is_clean,
