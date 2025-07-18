@@ -13,7 +13,7 @@ import numpy as np
 import h5py
 
 
-def write_single_hdf5(galcat, plot_logmhost, plot_halo_radius, plot_halo_pos, plot_halo_vel, output_path, Lbox):
+def write_single_hdf5(galcat, plot_logmhost, plot_halo_radius, plot_halo_pos, plot_halo_vel, output_path, Lbox, z_obs=None):
     """
     Write galaxy catalog to HDF5 file for single process.
     
@@ -33,6 +33,9 @@ def write_single_hdf5(galcat, plot_logmhost, plot_halo_radius, plot_halo_pos, pl
         Full path for output HDF5 file
     Lbox : float
         Simulation box size in Mpc/h
+    z_obs : float, optional
+        Observational redshift used for galaxy calculations.
+        If None, uses CURRENT_Z_OBS from constants
         
     Notes
     -----
@@ -69,20 +72,23 @@ def write_single_hdf5(galcat, plot_logmhost, plot_halo_radius, plot_halo_pos, pl
         f.create_dataset('halos/vel', data=np.array(plot_halo_vel))
         
         # Save metadata
+        actual_z_obs = z_obs if z_obs is not None else CURRENT_Z_OBS
+        redshift_str = f"z{actual_z_obs:.3f}"
+        
         f.attrs['Lbox'] = Lbox
-        f.attrs['z_obs'] = CURRENT_Z_OBS
+        f.attrs['z_obs'] = actual_z_obs
         f.attrs['lgmp_min'] = LGMP_MIN
         f.attrs['n_halos'] = len(plot_logmhost)
         f.attrs['n_galaxies'] = len(galcat['pos'])
         f.attrs['simulation_box'] = SIMULATION_BOX
         f.attrs['phase'] = CURRENT_PHASE
-        f.attrs['redshift'] = CURRENT_REDSHIFT
+        f.attrs['redshift'] = redshift_str
         f.attrs['mpi_rank'] = 0
         f.attrs['mpi_size'] = 1
 
 
 def write_parallel_hdf5(galcat, plot_logmhost, plot_halo_radius, plot_halo_pos, plot_halo_vel, 
-                       output_path, rank, size, comm, Lbox):
+                       output_path, rank, size, comm, Lbox, z_obs=None):
     """
     Write galaxy catalog using parallel HDF5 for multiple MPI ranks.
     
@@ -111,6 +117,9 @@ def write_parallel_hdf5(galcat, plot_logmhost, plot_halo_radius, plot_halo_pos, 
         MPI communicator for collective operations
     Lbox : float
         Simulation box size in Mpc/h
+    z_obs : float, optional
+        Observational redshift used for galaxy calculations.
+        If None, uses CURRENT_Z_OBS from constants
         
     Notes
     -----
@@ -294,14 +303,17 @@ def write_parallel_hdf5(galcat, plot_logmhost, plot_halo_radius, plot_halo_pos, 
         comm.Barrier()
         
         # COLLECTIVE METADATA OPERATIONS - all ranks participate
+        actual_z_obs = z_obs if z_obs is not None else CURRENT_Z_OBS
+        redshift_str = f"z{actual_z_obs:.3f}"
+        
         f.attrs['Lbox'] = Lbox
-        f.attrs['z_obs'] = CURRENT_Z_OBS
+        f.attrs['z_obs'] = actual_z_obs
         f.attrs['lgmp_min'] = LGMP_MIN
         f.attrs['n_halos'] = total_n_halos
         f.attrs['n_galaxies'] = total_n_galaxies
         f.attrs['simulation_box'] = SIMULATION_BOX
         f.attrs['phase'] = CURRENT_PHASE
-        f.attrs['redshift'] = CURRENT_REDSHIFT
+        f.attrs['redshift'] = redshift_str
         f.attrs['mpi_parallel'] = True
         f.attrs['mpi_size'] = size
 

@@ -12,7 +12,7 @@ from . import CURRENT_Z_OBS, LGMP_MIN
 from .emission_lines import add_emission_lines
 
 
-def generate_galaxies(logmhost, halo_radius, halo_pos, halo_vel, Lbox, rank=0):
+def generate_galaxies(logmhost, halo_radius, halo_pos, halo_vel, Lbox, rank=0, z_obs=None):
     """
     Generate galaxies for given halos using rgrspit_diffsky.
     
@@ -33,6 +33,9 @@ def generate_galaxies(logmhost, halo_radius, halo_pos, halo_vel, Lbox, rank=0):
         Simulation box size in Mpc/h
     rank : int, optional
         MPI rank for logging (default: 0)
+    z_obs : float, optional
+        Observational redshift for galaxy physics calculations.
+        If None, uses CURRENT_Z_OBS from constants (default: None)
         
     Returns
     -------
@@ -47,11 +50,14 @@ def generate_galaxies(logmhost, halo_radius, halo_pos, halo_vel, Lbox, rank=0):
     -----
     - Uses fixed random key (0) for reproducible galaxy generation across all MPI ranks
     - Applies minimum halo mass threshold LGMP_MIN for galaxy population
-    - Uses current observational redshift CURRENT_Z_OBS 
+    - Uses z_obs parameter if provided, otherwise falls back to CURRENT_Z_OBS constant
     - Galaxy catalog includes satellite galaxies via synthetic subhalo population
     """
     from dsps.cosmology import DEFAULT_COSMOLOGY
     from rgrspit_diffsky import mc_galpop
+    
+    # Use provided redshift or fall back to constant
+    redshift = z_obs if z_obs is not None else CURRENT_Z_OBS
     
     # Generate random key (same as baseline for reproducibility)
     ran_key = jran.key(0)
@@ -63,7 +69,7 @@ def generate_galaxies(logmhost, halo_radius, halo_pos, halo_vel, Lbox, rank=0):
         halo_radius,
         halo_pos,
         halo_vel,
-        CURRENT_Z_OBS,
+        redshift,
         LGMP_MIN,
         DEFAULT_COSMOLOGY,
         Lbox,

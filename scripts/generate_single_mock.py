@@ -26,7 +26,7 @@ from covariance_mocks import (
 from covariance_mocks.utils import ABACUS_BASE_PATH
 
 
-def generate_mock_for_catalog(catalog_path, output_path, n_gen=None):
+def generate_mock_for_catalog(catalog_path, output_path, n_gen=None, z_obs=None):
     """Generate mock galaxy catalog for a single AbacusSummit halo catalog using MPI if available"""
     
     # Initialize MPI and JAX
@@ -39,20 +39,20 @@ def generate_mock_for_catalog(catalog_path, output_path, n_gen=None):
         )
         
         # Generate galaxies
-        galcat = generate_galaxies(logmhost, halo_radius, halo_pos, halo_vel, Lbox, rank)
+        galcat = generate_galaxies(logmhost, halo_radius, halo_pos, halo_vel, Lbox, rank, z_obs)
         
         # Write output using appropriate method
         if MPI_AVAILABLE and comm is not None and size > 1:
             # Parallel HDF5 writing for multiple ranks
             write_parallel_hdf5(
                 galcat, logmhost, halo_radius, halo_pos, halo_vel, 
-                output_path, rank, size, comm, Lbox
+                output_path, rank, size, comm, Lbox, z_obs
             )  
         else:
             # Single process - write directly to output file
             write_single_hdf5(
                 galcat, logmhost, halo_radius, halo_pos, halo_vel, 
-                output_path, Lbox
+                output_path, Lbox, z_obs
             )
         
         print(f"Galaxy catalog saved to: {output_path}")
@@ -125,7 +125,8 @@ def main():
         output_path = os.path.join(drnout, output_filename)
         
         # Generate galaxy catalog
-        galcat = generate_mock_for_catalog(catalog_path, output_path, n_gen)
+        z_obs_float = float(redshift) if redshift else None
+        galcat = generate_mock_for_catalog(catalog_path, output_path, n_gen, z_obs_float)
         print(f"Generated {len(galcat['pos'])} galaxies total")
         
     elif machine == "poboy":
