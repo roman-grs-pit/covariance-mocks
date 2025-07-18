@@ -128,9 +128,12 @@ def check_status(args):
         
         stats = manager.check_job_status()
         summary = manager.get_production_summary()
+        git_tag = manager.get_git_tag()
         
         print(f"\nProduction: {summary['production']['name']} {summary['production']['version']}")
         print(f"Path: {manager.work_dir}")
+        if git_tag:
+            print(f"Git tag: {git_tag}")
         print(f"Total jobs: {summary['statistics']['total_jobs']}")
         print(f"Success rate: {summary['statistics']['success_rate']:.1%}")
         

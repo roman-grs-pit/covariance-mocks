@@ -298,9 +298,7 @@ class ProductionManager:
         # Log dependency version information
         self._log_dependency_versions()
         
-        # Create git tag for this production (unless dry run)
-        if not dry_run:
-            self._create_production_tag()
+        # Note: Git tag creation moved to initialize_production() method
     
     def _log_dependency_versions(self):
         """Log dependency version information for reproducibility."""
@@ -589,6 +587,10 @@ Technical details:
                 
                 self.job_db.insert_job(job)
                 jobs_created += 1
+        
+        # Create git tag for this production (unless dry run)
+        if not self.dry_run:
+            self._create_production_tag()
         
         return jobs_created
     
@@ -994,6 +996,13 @@ exit $EXIT_CODE
                 retried_count += 1
         
         return retried_count
+    
+    def get_git_tag(self) -> Optional[str]:
+        """Get the git tag associated with this production."""
+        tag_file = self.metadata_dir / "git_tag.txt"
+        if tag_file.exists():
+            return tag_file.read_text().strip()
+        return None
     
     def get_production_summary(self) -> Dict[str, Any]:
         """Get comprehensive production summary.
