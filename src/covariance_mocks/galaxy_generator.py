@@ -11,6 +11,22 @@ from jax import random as jran
 from . import CURRENT_Z_OBS, LGMP_MIN
 from .emission_lines import add_emission_lines
 
+# Lean v0 output. We keep only the galaxy fields the
+# covariance deliverable needs (positions/velocities, emission-line luminosities,
+# instantaneous stellar mass / sSFR / halo mass, IDs, and scalar metadata) and
+# drop everything else — the per-galaxy formation histories (sfh_table,
+# log_mah_table) and parameter blocks (mah_params, sfh_params, ...) that dominate
+# file size (~80-90%) but are redundant: l_halpha and the abundance-matching
+# calibration depend only on the instantaneous SFR. An allowlist (rather than a
+# denylist) is robust to upstream version drift adding new history/param arrays.
+KEEP_GALAXY_KEYS = frozenset((
+    "pos", "vel",
+    "l_halpha", "l_oii",
+    "logsm_t_obs", "logssfr_t_obs", "logmp_t_obs",
+    "upid",
+    "z_obs", "t_obs", "t0", "t_table",
+))
+
 
 def generate_galaxies(logmhost, halo_radius, halo_pos, halo_vel, Lbox, rank=0, z_obs=None):
     """
@@ -80,5 +96,13 @@ def generate_galaxies(logmhost, halo_radius, halo_pos, halo_vel, Lbox, rank=0, z
     # Add emission line luminosities
     galcat = add_emission_lines(galcat)
     print(f"Rank {rank}: added emission line luminosities (OII and H-alpha)")
-    
+
+    # Apply the lean output filter: keep only deliverable fields, freeing the
+    # large history/param arrays before the write (also reduces peak memory).
+    dropped = [k for k in list(galcat.keys()) if k not in KEEP_GALAXY_KEYS]
+    for k in dropped:
+        del galcat[k]
+    if dropped:
+        print(f"Rank {rank}: lean output — dropped {dropped}")
+
     return galcat
