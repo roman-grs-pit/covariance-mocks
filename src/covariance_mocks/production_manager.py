@@ -894,9 +894,46 @@ exit $EXIT_CODE
         script_path = self._create_slurm_batch_script(batch, jobs)
         return self._submit_slurm_batch_script(script_path)
     
+    def _query_sacct_states(self) -> Optional[Dict[int, tuple]]:
+        """Map SLURM job id -> (State, ExitCode) for this user's recent jobs.
+
+        Used to gate completion on a clean exit code rather than output-path
+        existence: a job that wrote a complete catalog but was wall-killed
+        (TIMEOUT) leaves its output path in place yet must not count as
+        COMPLETED. Returns None if sacct cannot be queried, in which case the
+        caller falls back to legacy path-existence gating.
+        """
+        try:
+            result = subprocess.run(
+                ["sacct", "-u", os.getenv("USER", ""), "-X", "-n", "-P",
+                 "--format=JobIDRaw,State,ExitCode"],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return None
+
+        states: Dict[int, tuple] = {}
+        for line in result.stdout.strip().split('\n'):
+            if not line:
+                continue
+            parts = line.split('|')
+            if len(parts) < 3:
+                continue
+            raw_id, state, exit_code = parts[0], parts[1], parts[2]
+            # State may carry a qualifier, e.g. "CANCELLED by 12345".
+            state = state.split()[0] if state else state
+            try:
+                states[int(raw_id)] = (state, exit_code)
+            except ValueError:
+                # Array master rows ("12345_[0-9]") are not plain ints; skip.
+                continue
+        return states
+
     def check_job_status(self) -> Dict[str, int]:
         """Check status of all jobs and update database.
-        
+
         Returns:
             Updated production statistics
         """
@@ -928,49 +965,78 @@ exit $EXIT_CODE
         except (subprocess.CalledProcessError, ValueError):
             slurm_jobs = {}
         
-        # Check all jobs in database for completion based on output files
+        # Terminal SLURM states for jobs no longer in the live queue. Completion
+        # is gated on a clean exit (COMPLETED, exit 0:0) AND a present output,
+        # not on the output path alone — a wall-killed job can leave a complete
+        # file yet must be counted FAILED so it is retried/diagnosed, not hidden.
+        sacct_states = self._query_sacct_states()
+
         all_jobs = []
         for status in [JobStatus.PENDING, JobStatus.STAGED, JobStatus.QUEUED, JobStatus.RUNNING]:
             all_jobs.extend(self.job_db.get_jobs_by_status(status))
-        
+
         for job in all_jobs:
-            # Check if output file exists
-            if Path(job.output_path).exists():
-                # Job completed - update status
-                if job.status != JobStatus.COMPLETED:
+            sid = job.slurm_job_id
+
+            # Still active in the queue: reflect running, decide nothing terminal.
+            if sid and sid in slurm_jobs:
+                slurm_status = slurm_jobs[sid]
+                if slurm_status in ["RUNNING", "R"] and job.status == JobStatus.QUEUED:
+                    self.job_db.update_job_status(
+                        job.job_id,
+                        JobStatus.RUNNING,
+                        started_at=datetime.utcnow().isoformat()
+                    )
+                continue
+
+            output_exists = Path(job.output_path).exists()
+
+            # Fallback: if sacct is unavailable, retain legacy path-existence
+            # gating so the monitor keeps working on systems without accounting.
+            if sacct_states is None:
+                if output_exists and job.status != JobStatus.COMPLETED:
                     self.job_db.update_job_status(
                         job.job_id,
                         JobStatus.COMPLETED,
                         completed_at=datetime.utcnow().isoformat()
                     )
                 continue
-            
-            # No output file - check SLURM status if we have job ID
-            if job.slurm_job_id and job.slurm_job_id in slurm_jobs:
-                slurm_status = slurm_jobs[job.slurm_job_id]
-                
-                if slurm_status in ["RUNNING", "R"]:
-                    if job.status == JobStatus.QUEUED:
+
+            terminal = sacct_states.get(sid) if sid else None
+
+            if terminal is not None:
+                state, exit_code = terminal
+                clean_exit = state.startswith("COMPLETED") and exit_code == "0:0"
+                if state in ("PENDING", "RUNNING", "REQUEUED", "RESIZING", "SUSPENDED"):
+                    # Not yet terminal (race with squeue); revisit next poll.
+                    continue
+                if clean_exit and output_exists:
+                    if job.status != JobStatus.COMPLETED:
                         self.job_db.update_job_status(
                             job.job_id,
-                            JobStatus.RUNNING,
-                            started_at=datetime.utcnow().isoformat()
+                            JobStatus.COMPLETED,
+                            completed_at=datetime.utcnow().isoformat()
                         )
-                elif slurm_status in ["FAILED", "F", "TIMEOUT", "TO", "CANCELLED", "CA"]:
-                    self.job_db.update_job_status(
-                        job.job_id,
-                        JobStatus.FAILED,
-                        error_message=f"SLURM status: {slurm_status}"
-                    )
-            elif job.slurm_job_id and job.slurm_job_id not in slurm_jobs:
-                # Job not in SLURM queue anymore and no output file - failed
+                else:
+                    reason = f"SLURM state {state} (exit {exit_code})"
+                    if clean_exit and not output_exists:
+                        reason = f"clean exit but missing output: {job.output_path}"
+                    if job.status != JobStatus.FAILED:
+                        self.job_db.update_job_status(
+                            job.job_id,
+                            JobStatus.FAILED,
+                            error_message=reason
+                        )
+            elif sid and not output_exists:
+                # Gone from the queue, no accounting record, no output: lost job.
                 if job.status in [JobStatus.QUEUED, JobStatus.RUNNING]:
                     self.job_db.update_job_status(
                         job.job_id,
                         JobStatus.FAILED,
-                        error_message="Job disappeared from SLURM queue without output"
+                        error_message="Job disappeared from SLURM without output"
                     )
-        
+            # else: not yet submitted (no slurm id) — leave as-is.
+
         return self.job_db.get_production_stats()
     
     def retry_failed_jobs(self) -> int:

@@ -108,6 +108,16 @@ def finalize_mpi(comm, rank, size, MPI_AVAILABLE):
     """
     # Explicit MPI cleanup to ensure clean exit
     if MPI_AVAILABLE and comm is not None and size > 1:
-        print(f"Rank {rank}: Starting MPI finalization")
+        import sys
+        print(f"Rank {rank}: Starting MPI finalization", flush=True)
         comm.Barrier()  # Ensure all ranks finish
-        print(f"Rank {rank}: MPI finalization complete")
+        print(f"Rank {rank}: MPI finalization complete", flush=True)
+        sys.stdout.flush()
+
+        # Finalize explicitly rather than leaving it to mpi4py's atexit handler.
+        # Under concurrent load the implicit teardown was observed to stall for
+        # minutes, getting jobs wall-killed just after a complete write. Doing it
+        # here (after the synchronizing Barrier) makes teardown deterministic.
+        from mpi4py import MPI
+        if not MPI.Is_finalized():
+            MPI.Finalize()
