@@ -152,17 +152,7 @@ def main():
         z_obs_float = float(redshift) if redshift else None
         galcat = generate_mock_for_catalog(catalog_path, output_path, n_gen, z_obs_float)
         print(f"Generated {len(galcat['pos'])} galaxies total")
-        _stamp("work-done (hard exit)")
-
-        # The science, write, and MPI finalize are all complete here. Exit
-        # immediately rather than fall through to interpreter shutdown: under
-        # concurrent load the implicit atexit MPI teardown could stall for
-        # minutes and get the job wall-killed seconds after a complete write
-        # (the observed TIMEOUT-at-the-finish-line mode). Flush first so no
-        # output is lost, then bypass atexit/GC entirely.
-        sys.stdout.flush()
-        sys.stderr.flush()
-        os._exit(0)
+        _stamp("done")
 
     elif machine == "poboy":
         raise NotImplementedError("poboy machine not yet implemented")

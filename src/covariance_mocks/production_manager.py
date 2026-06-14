@@ -627,11 +627,15 @@ Technical details:
                 batch.submitted_at = datetime.utcnow().isoformat()
                 self.job_db.update_batch_status(batch.batch_id, JobStatus.QUEUED, slurm_job_id)
                 
-                # Update job statuses
+                # Update job statuses. Persist the SLURM id so completion can be
+                # gated on this job's actual exit state (sacct) rather than on
+                # output-path existence. (batch_size=1 here, so the batch's
+                # SLURM id is this job's id.)
                 for job in batch_jobs:
                     self.job_db.update_job_status(
-                        job.job_id, 
+                        job.job_id,
                         JobStatus.QUEUED,
+                        slurm_job_id=slurm_job_id,
                         submit_count=job.submit_count + 1
                     )
                 
@@ -991,9 +995,10 @@ exit $EXIT_CODE
 
             output_exists = Path(job.output_path).exists()
 
-            # Fallback: if sacct is unavailable, retain legacy path-existence
-            # gating so the monitor keeps working on systems without accounting.
-            if sacct_states is None:
+            # Fall back to legacy path-existence gating when a clean exit cannot
+            # be verified: sacct unavailable, or this job has no recorded SLURM id
+            # (submitted before the id was persisted to the DB).
+            if sacct_states is None or not sid:
                 if output_exists and job.status != JobStatus.COMPLETED:
                     self.job_db.update_job_status(
                         job.job_id,
