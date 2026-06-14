@@ -902,8 +902,8 @@ OUTPUT_PATH="${{OUTPUT_PATHS[$SLURM_ARRAY_TASK_ID]}}"
 
 echo "Starting job $JOB_ID: realization $REALIZATION, redshift $REDSHIFT"
 
-# Run the mock generation
-python {Path(__file__).parent.parent.parent / "scripts" / "generate_single_mock.py"} \\
+# Run the mock generation with MPI (8 ranks = 2 nodes x 4 GPU, as in the single-job path)
+srun -n 8 python {Path(__file__).parent.parent.parent / "scripts" / "generate_single_mock.py"} \\
     {self.machine} \\
     "$OUTPUT_PATH" \\
     --realization "$REALIZATION" \\
@@ -1019,6 +1019,77 @@ exit $EXIT_CODE
                 if runnable:
                     added += 1
         return added
+
+    def _box_done(self, job) -> bool:
+        """True if this box's leaf catalog has already been written."""
+        return any(Path(job.output_path).glob("mock_AbacusSummit*.hdf5"))
+
+    def submit_redshift_arrays(self, z_order, skip_done=True) -> List[tuple]:
+        """Submit one SLURM job array per redshift, in the given priority order.
+
+        Each array runs every input-complete realization at that redshift whose
+        output catalog is not already on disk — one sbatch per redshift instead
+        of one per box. Returns [(z, n_tasks, slurm_job_id), ...].
+        """
+        redshifts = self.config["science"]["redshifts"]
+        by_z = {}
+        for st in [JobStatus.PENDING, JobStatus.STAGED, JobStatus.QUEUED]:
+            for j in self.job_db.get_jobs_by_status(st):
+                by_z.setdefault(round(j.redshift, 3), []).append(j)
+
+        submitted = []
+        for z in z_order:
+            jobs = sorted(by_z.get(round(z, 3), []), key=lambda j: j.realization)
+            jobs = [j for j in jobs if realization_runnable(j.realization, redshifts)]
+            if skip_done:
+                jobs = [j for j in jobs if not self._box_done(j)]
+            if not jobs:
+                print(f"z={z}: nothing to submit (all done or none runnable)")
+                continue
+            batch = BatchSpec(batch_id=f"z{z:.3f}_arr_{int(time.time())}",
+                              job_ids=[j.job_id for j in jobs])
+            script_path = self._create_slurm_batch_script(batch, jobs)
+            sid = self._submit_slurm_batch_script(script_path)
+            batch.status = JobStatus.QUEUED
+            batch.slurm_array_id = sid
+            batch.submitted_at = datetime.utcnow().isoformat()
+            self.job_db.insert_batch(batch)
+            for j in jobs:
+                self.job_db.update_job_status(j.job_id, JobStatus.QUEUED, slurm_job_id=sid)
+            submitted.append((z, len(jobs), sid))
+            print(f"submitted z={z}: array of {len(jobs)} tasks as SLURM {sid}")
+        return submitted
+
+    def submit_redshift_individual(self, z_order, skip_done=True) -> int:
+        """Submit runnable, not-done boxes as INDIVIDUAL jobs, redshift slice by
+        slice in priority order.
+
+        NERSC reserves a job array's full cost up-front against the per-user
+        balance, which rejects a full-realization array; one job per box is
+        costed separately and passes. Ordering is preserved by submitting the
+        priority redshifts first (earlier submit -> earlier in the queue).
+        Returns the number of jobs submitted.
+        """
+        redshifts = self.config["science"]["redshifts"]
+        by_z = {}
+        for st in [JobStatus.PENDING, JobStatus.STAGED, JobStatus.QUEUED]:
+            for j in self.job_db.get_jobs_by_status(st):
+                by_z.setdefault(round(j.redshift, 3), []).append(j)
+
+        total = 0
+        for z in z_order:
+            jobs = sorted(by_z.get(round(z, 3), []), key=lambda j: j.realization)
+            jobs = [j for j in jobs if realization_runnable(j.realization, redshifts)]
+            if skip_done:
+                jobs = [j for j in jobs if not self._box_done(j)]
+            for j in jobs:
+                batch = BatchSpec(batch_id=f"z{z:.3f}_r{j.realization:04d}", job_ids=[j.job_id])
+                script_path = self._create_slurm_batch_script(batch, [j])
+                sid = self._submit_slurm_batch_script(script_path)
+                self.job_db.update_job_status(j.job_id, JobStatus.QUEUED, slurm_job_id=sid)
+                total += 1
+            print(f"z={z}: submitted {len(jobs)} individual jobs ({total} total)", flush=True)
+        return total
 
     def _query_sacct_states(self) -> Optional[Dict[int, tuple]]:
         """Map SLURM job id -> (State, ExitCode) for this user's recent jobs.
