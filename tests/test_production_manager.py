@@ -196,7 +196,8 @@ class TestProductionManager:
         assert config_file.exists()
     
     @patch('covariance_mocks.production_manager.ProductionConfigLoader')
-    def test_production_initialization(self, mock_loader, temp_config_file, temp_work_dir, test_production_config):
+    @patch('covariance_mocks.production_manager.realization_runnable', return_value=True)
+    def test_production_initialization(self, mock_runnable, mock_loader, temp_config_file, temp_work_dir, test_production_config):
         """Test production job creation."""
         # Mock config loader
         mock_loader_instance = MagicMock()

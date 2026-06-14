@@ -1,0 +1,56 @@
+# Rehearsal production: 100 realizations as a full-pipeline rehearsal.
+# Treats the 100 realizations as "the entire ensemble": populate all -> ensemble
+# abundance-matching calibration -> apply -> characterize (mean LF + 68/95% scatter).
+# Walltime bumped to 30 min (vs 10) to absorb the concurrent-CFS-write slowdown that
+# caused TIMEOUTs in smoketest100 (catalogs were complete, but jobs hit the 10-min limit).
+
+production:
+  name: "rehearsal100"
+  version: "v1.0"
+  description: "Rehearsal: 100 realizations (ph3000-ph3099) x 12 redshifts as the full ensemble; lean output, 30-min walltime"
+  tags: ["rehearsal", "ensemble-calibration", "lean-output"]
+
+science:
+  cosmology: "AbacusSummit"
+  redshifts: [0.2, 0.25, 0.3, 0.4, 0.5, 0.8, 1.1, 1.4, 1.7, 2.0, 2.5, 3.0]
+  realizations:
+    start: 3000
+    count: 100
+    step: 1
+    # 19 of the base-range realizations have absent or incomplete (missing some
+    # redshifts) AbacusSummit halo catalogs; their boxes are auto-flagged
+    # MISSING_INPUT. These 19 complete replacements (all 12 redshifts present)
+    # bring the ensemble back to 100 fully-populated realizations.
+    #   fully absent (7):   3008 3037 3048 3055 3058 3071 3095
+    #   missing some z (12): 3006 3010 3018 3024 3026 3027 3036 3038 3059 3060 3078 3089
+    include: [3100, 3101, 3102, 3103, 3104, 3105, 3106,
+              3108, 3109, 3110, 3111, 3112, 3114, 3115, 3116, 3117, 3118, 3119, 3120]
+  catalog_params:
+    magnitude_limit: 25.0
+    area_deg2: 1000.0
+
+execution:
+  job_type: "gpu_intensive"
+  batch_size: 1
+  timeout_hours: 0.5
+  retry_policy:
+    max_retries: 3
+    backoff_multiplier: 2.0
+    initial_delay_minutes: 5.0
+
+# GPU resources (proven): 2 nodes x 4 tasks x 4 GPU = 8 GPU/box
+resources:
+  nodes_per_job: 2
+  tasks_per_node: 4
+  memory_gb: 128.0
+  gpus_per_node: 4
+  constraint: "gpu"
+
+outputs:
+  base_path: "/global/cfs/cdirs/m4943/Simulations/covariance_mocks"
+  structure: "hierarchical"
+  compression: "gzip"
+  cleanup_policy:
+    keep_logs_days: 365
+    keep_intermediate: true
+    archive_completed: false

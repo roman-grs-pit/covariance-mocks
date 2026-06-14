@@ -18,6 +18,31 @@ from enum import Enum
 import subprocess
 
 from .production_config import ProductionConfigLoader, ConfigurationError
+from .utils import ABACUS_BASE_PATH
+
+
+def input_catalog_dir(realization, redshift):
+    """Expected AbacusSummit halo-catalog directory for a (realization, redshift)."""
+    return os.path.join(
+        ABACUS_BASE_PATH,
+        f"AbacusSummit_small_c000_ph{int(realization)}",
+        "halos",
+        f"z{float(redshift):.3f}",
+    )
+
+
+def input_catalog_exists(realization, redshift):
+    """True if the halo catalog for this box is present on disk."""
+    return os.path.isdir(input_catalog_dir(realization, redshift))
+
+
+def realization_runnable(realization, redshifts):
+    """True only if EVERY configured redshift has an input catalog.
+
+    A realization missing any redshift is excluded wholesale (no partial
+    realizations) so the ensemble is uniform across redshift at every box.
+    """
+    return all(input_catalog_exists(realization, z) for z in redshifts)
 
 
 class JobStatus(Enum):
@@ -30,6 +55,7 @@ class JobStatus(Enum):
     FAILED = "failed"
     CANCELLED = "cancelled"
     RETRYING = "retrying"
+    MISSING_INPUT = "missing_input"   # input halo catalog absent; never submitted
 
 
 @dataclass
@@ -563,28 +589,45 @@ Technical details:
         
         science_config = self.config["science"]
         realizations = science_config["realizations"]
-        
-        for realization in range(realizations["start"], 
-                                realizations["start"] + realizations["count"], 
-                                realizations.get("step", 1)):
-            for redshift in science_config["redshifts"]:
+
+        realization_ids = list(range(
+            realizations["start"],
+            realizations["start"] + realizations["count"],
+            realizations.get("step", 1),
+        ))
+        # Optional explicit additions (e.g. replacements for realizations whose
+        # input catalogs are missing) and exclusions, both lists of phase ints.
+        for extra in realizations.get("include", []):
+            if extra not in realization_ids:
+                realization_ids.append(extra)
+        exclude = set(realizations.get("exclude", []))
+        realization_ids = [r for r in realization_ids if r not in exclude]
+
+        redshifts = science_config["redshifts"]
+        for realization in realization_ids:
+            # Exclude the whole realization if any redshift's input is absent.
+            runnable = realization_runnable(realization, redshifts)
+            for redshift in redshifts:
                 job_id = f"r{realization:04d}_z{redshift:.3f}"
-                
+
                 # Generate output path
                 if self.config["outputs"]["structure"] == "hierarchical":
                     output_path = self.catalogs_dir / f"r{realization:04d}" / f"mock_z{redshift:.3f}.hdf5"
                 else:
                     output_path = self.catalogs_dir / f"mock_r{realization:04d}_z{redshift:.3f}.hdf5"
-                
-                output_path.parent.mkdir(parents=True, exist_ok=True)
-                
+
+                status = JobStatus.PENDING if runnable else JobStatus.MISSING_INPUT
+                if runnable:
+                    output_path.parent.mkdir(parents=True, exist_ok=True)
+
                 job = JobSpec(
                     job_id=job_id,
                     realization=realization,
                     redshift=redshift,
-                    output_path=str(output_path)
+                    output_path=str(output_path),
+                    status=status,
                 )
-                
+
                 self.job_db.insert_job(job)
                 jobs_created += 1
         
@@ -677,9 +720,29 @@ Technical details:
             List of staged batch IDs
         """
         pending_jobs = self.job_db.get_jobs_by_status(JobStatus.PENDING)
+
+        # Proactive guard: never stage any box of a realization missing one or
+        # more input catalogs; flag the whole realization MISSING_INPUT so it is
+        # tracked but never submitted (no partial realizations).
+        redshifts = self.config["science"]["redshifts"]
+        runnable_real = {}
+        runnable, missing = [], []
+        for job in pending_jobs:
+            ok = runnable_real.setdefault(job.realization,
+                                          realization_runnable(job.realization, redshifts))
+            (runnable if ok else missing).append(job)
+        for job in missing:
+            self.job_db.update_job_status(
+                job.job_id, JobStatus.MISSING_INPUT,
+                error_message="realization has incomplete input catalogs"
+            )
+        if missing:
+            print(f"Skipped {len(missing)} job(s) in realizations with incomplete inputs")
+        pending_jobs = runnable
+
         if not pending_jobs:
             return []
-        
+
         batch_size = self.config["execution"]["batch_size"]
         staged_batches = []
         
@@ -897,7 +960,66 @@ exit $EXIT_CODE
         """
         script_path = self._create_slurm_batch_script(batch, jobs)
         return self._submit_slurm_batch_script(script_path)
-    
+
+    def reconcile_missing_inputs(self) -> int:
+        """Flag any non-terminal job whose input halo catalog is absent.
+
+        Marks PENDING/STAGED/QUEUED jobs with a missing AbacusSummit catalog as
+        MISSING_INPUT so they are excluded from staging, submission, and the
+        failure count. Returns the number newly flagged.
+        """
+        redshifts = self.config["science"]["redshifts"]
+        runnable_real = {}
+        flagged = 0
+        for status in [JobStatus.PENDING, JobStatus.STAGED, JobStatus.QUEUED]:
+            for job in self.job_db.get_jobs_by_status(status):
+                ok = runnable_real.setdefault(job.realization,
+                                              realization_runnable(job.realization, redshifts))
+                if not ok:
+                    self.job_db.update_job_status(
+                        job.job_id, JobStatus.MISSING_INPUT,
+                        error_message="realization has incomplete input catalogs"
+                    )
+                    flagged += 1
+        return flagged
+
+    def add_realizations(self, realization_ids) -> int:
+        """Insert jobs for additional realizations (all redshifts) as PENDING.
+
+        Skips boxes already present in the DB and boxes with no input catalog
+        (flagged MISSING_INPUT). Returns the number of runnable jobs added.
+        Run stage_jobs() afterward to generate their scripts.
+        """
+        existing = set()
+        for st in JobStatus:
+            existing |= {j.job_id for j in self.job_db.get_jobs_by_status(st)}
+
+        added = 0
+        redshifts = self.config["science"]["redshifts"]
+        hierarchical = self.config["outputs"]["structure"] == "hierarchical"
+        for realization in realization_ids:
+            runnable = realization_runnable(realization, redshifts)
+            for redshift in redshifts:
+                job_id = f"r{realization:04d}_z{redshift:.3f}"
+                if job_id in existing:
+                    continue
+                if hierarchical:
+                    output_path = self.catalogs_dir / f"r{realization:04d}" / f"mock_z{redshift:.3f}.hdf5"
+                else:
+                    output_path = self.catalogs_dir / f"mock_r{realization:04d}_z{redshift:.3f}.hdf5"
+                if runnable:
+                    output_path.parent.mkdir(parents=True, exist_ok=True)
+                self.job_db.insert_job(JobSpec(
+                    job_id=job_id,
+                    realization=realization,
+                    redshift=redshift,
+                    output_path=str(output_path),
+                    status=JobStatus.PENDING if runnable else JobStatus.MISSING_INPUT,
+                ))
+                if runnable:
+                    added += 1
+        return added
+
     def _query_sacct_states(self) -> Optional[Dict[int, tuple]]:
         """Map SLURM job id -> (State, ExitCode) for this user's recent jobs.
 
