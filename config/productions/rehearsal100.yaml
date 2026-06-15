@@ -40,6 +40,7 @@ execution:
 
 # GPU resources (proven): 2 nodes x 4 tasks x 4 GPU = 8 GPU/box
 resources:
+  account: "cosmosim_g"   # GPU charge account for cosmosim (m4943_g per-user balance was ~1 node-hr; cosmosim_g is ample). Storage stays on m4943 CFS.
   nodes_per_job: 2
   tasks_per_node: 4
   memory_gb: 128.0
