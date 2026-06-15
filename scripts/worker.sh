@@ -48,7 +48,9 @@ while IFS=' ' read -r real z out; do
     compgen -G "$out/mock_AbacusSummit*.hdf5" >/dev/null 2>&1 && continue   # race recheck
     mkdir -p "$out"
     echo "[worker $SLURM_JOB_ID $(date '+%H:%M:%S')] populate $box"
-    srun -n 8 python "$GEN" nersc "$out" --realization "$real" --redshift "$z"
+    # </dev/null: srun forwards stdin to its tasks, which would otherwise consume
+    # the worklist this while-loop reads from (ending the loop after one box).
+    srun -n 8 python "$GEN" nersc "$out" --realization "$real" --redshift "$z" </dev/null
     rc=$?
     if [ "$rc" -eq 0 ] && compgen -G "$out/mock_AbacusSummit*.hdf5" >/dev/null 2>&1; then
         ndone=$(( ndone + 1 ))
