@@ -6,7 +6,7 @@
 #SBATCH --ntasks-per-node=4
 #SBATCH --cpus-per-task=32
 #SBATCH --gpus-per-node=4
-#SBATCH --time=06:00:00
+#SBATCH --time=01:00:00
 #SBATCH --job-name=covmock_worker
 #SBATCH --output=/global/cfs/cdirs/cosmosim/covariance_mocks/full_v1.0/logs/worker_%j.out
 #SBATCH --error=/global/cfs/cdirs/cosmosim/covariance_mocks/full_v1.0/logs/worker_%j.err
@@ -59,3 +59,15 @@ while IFS=' ' read -r real z out; do
     fi
 done < "$WL"
 echo "[worker $SLURM_JOB_ID] done: completed=$ndone failed=$nfail"
+
+# Resubmit-on-timeout: chain a successor while boxes remain to claim, so the pool
+# self-sustains (1-in / 1-out keeps it at the launched size). Stop when every box
+# is claimed (nothing left to do) — claims released by failures get re-picked up.
+total=$(wc -l < "$WL")
+claimed=$(ls "$CLAIMS" 2>/dev/null | wc -l)
+if [ "$claimed" -lt "$total" ]; then
+    (cd "$REPO" && sbatch scripts/worker.sh "$WL" "$CLAIMS" "$MARGIN" >/dev/null 2>&1) \
+        && echo "[worker $SLURM_JOB_ID] resubmitted successor (claimed $claimed/$total)"
+else
+    echo "[worker $SLURM_JOB_ID] all $total boxes claimed — not resubmitting"
+fi
