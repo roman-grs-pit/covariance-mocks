@@ -32,7 +32,11 @@ science:
 execution:
   job_type: "gpu_intensive"
   batch_size: 1
-  timeout_hours: 0.5
+  # 10-min walltime, data-driven: 155 fixed-code boxes ran median 142 s, p99 229 s,
+  # max 305 s (5.1 min). 10 min gives ~2x margin over the tail while letting SLURM
+  # backfill far more (it only slots a job into a gap >= its requested walltime) and
+  # cutting the up-front node-hr cost reservation. Was 30 min (oversized).
+  timeout_hours: 0.1667
   retry_policy:
     max_retries: 3
     backoff_multiplier: 2.0
