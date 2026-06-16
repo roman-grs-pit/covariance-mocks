@@ -9,19 +9,19 @@ Coordinates galaxy population using rgrspit_diffsky with batch processing.
 
 from jax import random as jran
 from . import CURRENT_Z_OBS, LGMP_MIN
-from .emission_lines import add_emission_lines
 
-# Lean v0 output. We keep only the galaxy fields the
-# covariance deliverable needs (positions/velocities, emission-line luminosities,
-# instantaneous stellar mass / sSFR / halo mass, IDs, and scalar metadata) and
-# drop everything else — the per-galaxy formation histories (sfh_table,
+# Lean SFR-only output (2026-06-16 amendment). The deliverable carries no line
+# luminosities; the emission-line step is dropped from production. We keep only
+# the raw per-galaxy fields the SFR-only data model needs — positions/velocities,
+# instantaneous stellar mass / sSFR / peak halo mass, the central/sat ID, and
+# scalar metadata — and drop everything else: the formation histories (sfh_table,
 # log_mah_table) and parameter blocks (mah_params, sfh_params, ...) that dominate
-# file size (~80-90%) but are redundant: l_halpha and the abundance-matching
-# calibration depend only on the instantaneous SFR. An allowlist (rather than a
-# denylist) is robust to upstream version drift adding new history/param arrays.
+# file size (~80-90%) but are redundant (the instantaneous SFR = 10**logssfr_t_obs
+# · 10**logsm_t_obs reproduces them). The UM-corrected sfr_corr / mstar_corr are
+# added by the downstream ensemble two-pass calibration, not here. An allowlist
+# (rather than a denylist) is robust to upstream version drift adding new arrays.
 KEEP_GALAXY_KEYS = frozenset((
     "pos", "vel",
-    "l_halpha", "l_oii",
     "logsm_t_obs", "logssfr_t_obs", "logmp_t_obs",
     "upid",
     "z_obs", "t_obs", "t0", "t_table",
@@ -92,10 +92,10 @@ def generate_galaxies(logmhost, halo_radius, halo_pos, halo_vel, Lbox, rank=0, z
     )
     
     print(f"Rank {rank}: generated mock with {len(galcat['pos'])} galaxies from {len(logmhost)} halos")
-    
-    # Add emission line luminosities
-    galcat = add_emission_lines(galcat)
-    print(f"Rank {rank}: added emission line luminosities (OII and H-alpha)")
+
+    # SFR-only deliverable: no emission-line step. The raw SFR (and the downstream
+    # UM-corrected sfr_corr built ensemble-wide in the two-pass calibration) come
+    # from logssfr_t_obs / logsm_t_obs, kept by the allowlist below.
 
     # Apply the lean output filter: keep only deliverable fields, freeing the
     # large history/param arrays before the write (also reduces peak memory).
