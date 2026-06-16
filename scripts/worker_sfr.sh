@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --account=cosmosim_g
-#SBATCH --qos=regular
+#SBATCH --qos=premium
 #SBATCH --constraint=gpu
 #SBATCH --nodes=2
 #SBATCH --ntasks-per-node=4
