@@ -52,6 +52,9 @@ while IFS=' ' read -r real z out; do
         # normalize the generated filename to the worklist's expected path
         gen=$(ls "$outdir"/mock_AbacusSummit*z${z}*.hdf5 2>/dev/null | head -1)
         [ -n "$gen" ] && [ "$gen" != "$out" ] && mv -f "$gen" "$out"
+        # compute-as-you-go: emit the per-box stats sidecar now, while the catalog is fresh
+        # in page cache, so the dashboard never re-reads the 2.9 GB catalogs on refresh.
+        python "$REPO/scripts/box_stats.py" "$out" >/dev/null 2>&1 || echo "[worker $SLURM_JOB_ID] sidecar failed for $box"
         ndone=$(( ndone + 1 ))
     else
         echo "[worker $SLURM_JOB_ID] $box FAILED rc=$rc -> release claim for retry"
