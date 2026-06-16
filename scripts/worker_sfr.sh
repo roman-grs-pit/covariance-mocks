@@ -25,6 +25,7 @@ source "$REPO/scripts/load_env.sh"
 WL="${1:?worklist path required}"
 CLAIMS="${2:?claims dir required}"
 MARGIN="${3:-420}"
+QOS="${4:-premium}"     # premium (cap 5, high priority) or regular (cap 5000, backfill surface)
 
 ENDTS=$(date -d "$(scontrol show job "$SLURM_JOB_ID" 2>/dev/null \
         | grep -oP 'EndTime=\K[0-9T:-]+')" +%s 2>/dev/null)
@@ -63,8 +64,11 @@ echo "[worker $SLURM_JOB_ID] done: completed=$ndone failed=$nfail"
 total=$(wc -l < "$WL")
 claimed=$(ls "$CLAIMS" 2>/dev/null | wc -l)
 if [ "$claimed" -lt "$total" ]; then
-    (cd "$REPO" && sbatch scripts/worker_sfr.sh "$WL" "$CLAIMS" "$MARGIN" >/dev/null 2>&1) \
-        && echo "[worker $SLURM_JOB_ID] resubmitted successor (claimed $claimed/$total)"
+    # resubmit under the same QOS this worker ran with. A premium successor may bounce off
+    # the 5-job premium cap (QOSMaxSubmitJobPerUserLimit) -- harmless, the regular pool
+    # sustains backfill surface and a premium slot reopens when another premium job ends.
+    (cd "$REPO" && sbatch --qos="$QOS" scripts/worker_sfr.sh "$WL" "$CLAIMS" "$MARGIN" "$QOS" >/dev/null 2>&1) \
+        && echo "[worker $SLURM_JOB_ID] resubmitted successor qos=$QOS (claimed $claimed/$total)"
 else
     echo "[worker $SLURM_JOB_ID] all $total boxes claimed — not resubmitting"
 fi
