@@ -116,8 +116,16 @@ def corrected_curves(side, f1, f2):
     nsfr = np.array([H[logsfr_corr > s].sum() for s in SFRGRID]) / v
     sfrd = (H * sfr_corr_lin).sum() / v
 
-    # M*_corr per mp bin = f1; GSMF_corr = weighted hist of f1 into SMB
-    gsmf = np.histogram(f1, bins=SMB, weights=mp_w)[0] / (v * 0.2)
+    # GSMF_corr — smooth. M*_corr = f1(Mpeak) is monotonic, so the corrected cumulative GSMF
+    # is n_corr(>M*) = n_sim(>Mpeak(M*)); differentiate it. Computing it this way (from the
+    # smooth cumulative n_sim and the smooth f1) avoids the coarse/jumpy result of histogramming
+    # the 250 discrete f1 values into the M* bins.
+    cum_from_top = np.cumsum(mp_w[::-1])[::-1]
+    n_above = (cum_from_top - 0.5 * mp_w) / v               # n_sim(>Mpeak center) [Mpc^-3]
+    fin = np.isfinite(f1) & (mp_w > 0)
+    ncum_edges = np.interp(SMB, f1[fin], n_above[fin],      # f1 ascending; n_above descending
+                           left=n_above[fin][0], right=0.0)
+    gsmf = np.clip(-np.diff(ncum_edges) / 0.2, 0.0, None)   # differential GSMF per dex
 
     # sSFR_corr(M*_corr): weighted linear-mean sSFR_corr in M*_corr (=f1) bins
     sm_idx = np.digitize(f1, SMB) - 1
