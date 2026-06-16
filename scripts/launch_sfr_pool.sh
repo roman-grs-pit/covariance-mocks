@@ -1,0 +1,25 @@
+#!/bin/bash
+# Launch the SFR-only worker pool for one redshift (sfr_v1.0).
+#   ./launch_sfr_pool.sh <redshift> [n_workers]
+# Builds the worklist (if missing) and submits an initial wave of self-scheduling workers;
+# each chains a successor while boxes remain, so the pool self-sustains at the launched size.
+set -eu
+REPO=/global/homes/m/malvarez/work/grspit/covariance-mocks
+OUTROOT=/global/cfs/cdirs/cosmosim/covariance_mocks/sfr_v1.0
+PY=/global/cfs/cdirs/m4943/Simulations/covariance_mocks/conda_envs/grspit/bin/python
+
+Z="${1:?redshift required, e.g. 1.400}"
+NW="${2:-20}"
+ZS=$(printf "%.3f" "$Z")
+WL="$OUTROOT/worklist_z${ZS}.txt"
+CLAIMS="$OUTROOT/claims_z${ZS}"
+
+[ -f "$WL" ] || "$PY" "$REPO/scripts/build_worklist_sfr.py" "$Z"
+TOTAL=$(wc -l < "$WL")
+echo "worklist $WL: $TOTAL boxes; submitting $NW workers"
+mkdir -p "$OUTROOT/logs"
+for i in $(seq 1 "$NW"); do
+    sbatch "$REPO/scripts/worker_sfr.sh" "$WL" "$CLAIMS" 420 >/dev/null
+done
+echo "submitted $NW workers for z=$ZS"
+squeue -u "$USER" -h -o "%j" | sort | uniq -c
