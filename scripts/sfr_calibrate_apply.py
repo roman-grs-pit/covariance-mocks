@@ -155,9 +155,12 @@ def main():
     ap.add_argument("--um-targets", required=True)
     ap.add_argument("--out", required=True, help="calibration output dir")
     ap.add_argument("--procs", type=int, default=1)
+    ap.add_argument("--limit", type=int, default=0, help="process only the first N catalogs (preview)")
     args = ap.parse_args()
 
     paths = sorted(glob.glob(args.catalogs))
+    if args.limit:
+        paths = paths[:args.limit]
     if not paths:
         print(f"no catalogs match {args.catalogs}", file=sys.stderr)
         return 2
