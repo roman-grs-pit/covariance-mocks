@@ -25,11 +25,13 @@ MARGIN=420
 PREM_TARGET=5      # premium per-user cap on Perlmutter GPU
 REG_TARGET=64      # regular backfill floor (self-chaining sustains any surplus above this)
 
-# Stop refilling once the whole breadth set is claimed/done.
+# Stop refilling once every breadth box is produced. Count actual output files, not
+# claim dirs: workers skip already-existing boxes (e.g. the z1.4 boxes the depth pool
+# made) WITHOUT creating a claim, so the claim count never reaches the worklist size.
 total=$(wc -l < "$WL" 2>/dev/null || echo 0)
-claimed=$(ls "$CLAIMS" 2>/dev/null | wc -l)
-if [ "$total" -gt 0 ] && [ "$claimed" -ge "$total" ]; then
-    echo "[topup $(date -u +%FT%TZ)] breadth complete ($claimed/$total) — nothing to refill"
+produced=$(find "$OUTROOT/catalogs" -name 'mock_z*.hdf5' 2>/dev/null | wc -l)
+if [ "$total" -gt 0 ] && [ "$produced" -ge "$total" ]; then
+    echo "[topup $(date -u +%FT%TZ)] breadth complete ($produced/$total produced) — nothing to refill"
     exit 0
 fi
 
@@ -49,4 +51,4 @@ done
 for _ in $(seq 1 "$add_reg"); do
     sbatch --qos=regular scripts/worker_sfr.sh "$WL" "$CLAIMS" "$MARGIN" regular >/dev/null 2>&1 || true
 done
-echo "[topup $(date -u +%FT%TZ)] premium ${nprem}->${PREM_TARGET} (+${add_prem}), regular ${nreg}->${REG_TARGET} (+${add_reg}), claimed ${claimed}/${total}"
+echo "[topup $(date -u +%FT%TZ)] premium ${nprem}->${PREM_TARGET} (+${add_prem}), regular ${nreg}->${REG_TARGET} (+${add_reg}), produced ${produced}/${total}"
