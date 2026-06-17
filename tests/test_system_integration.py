@@ -38,6 +38,7 @@ class TestSLURMIntegration:
         assert len(plot_files) > 0, "No plot files found after plotting"
     
     @pytest.mark.system
+    @pytest.mark.slow
     def test_slurm_environment_available(self):
         """Test that SLURM environment is properly configured."""
         # Check that we're on a SLURM system
@@ -49,6 +50,7 @@ class TestSLURMIntegration:
         assert result == 0, "Cannot query SLURM partition info"
     
     @pytest.mark.system
+    @pytest.mark.slow
     def test_conda_environment_loaded(self):
         """Test that conda environment is properly loaded."""
         conda_env = os.environ.get("CONDA_ENV")
@@ -56,6 +58,7 @@ class TestSLURMIntegration:
         assert Path(conda_env).exists(), f"Conda environment path does not exist: {conda_env}"
     
     @pytest.mark.system
+    @pytest.mark.slow
     def test_output_directory_writable(self, temp_output_dir):
         """Test that output directory is writable."""
         test_file = temp_output_dir / "test_write.tmp"
@@ -74,6 +77,7 @@ class TestSLURMConfiguration:
     """Test SLURM configuration and job parameters."""
     
     @pytest.mark.system
+    @pytest.mark.slow
     def test_slurm_account_accessible(self):
         """Test that the NERSC account is accessible."""
         # This would need to be customized based on the actual account validation method
@@ -83,6 +87,7 @@ class TestSLURMConfiguration:
         assert config.nersc_account == "m4943"
     
     @pytest.mark.system
+    @pytest.mark.slow
     def test_gpu_partition_available(self):
         """Test that GPU partition is available."""
         result = os.system("sinfo -p gpu >/dev/null 2>&1")
@@ -96,6 +101,7 @@ class TestErrorHandling:
     """Test error handling in SLURM integration."""
     
     @pytest.mark.system
+    @pytest.mark.slow
     def test_invalid_output_directory(self):
         """Test handling of invalid output directory."""
         invalid_config = MockGenerationConfig(
@@ -116,6 +122,7 @@ class TestErrorHandling:
             pass
     
     @pytest.mark.system
+    @pytest.mark.slow
     def test_existing_output_no_force(self, shared_catalog):
         """Test behavior when output exists and force=False."""
         # Create config with same output file as shared catalog to test file exists behavior

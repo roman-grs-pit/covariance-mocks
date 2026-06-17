@@ -1,0 +1,47 @@
+# Smoke-test production: 100 realizations, lean output at scale
+# Purpose: validate the production sbatch path, lean output (~3.7 GB/box),
+# output location, and Halpha LFs before the full 1883-realization run.
+# Writes to its own productions/smoketest100_* dir; does not touch alpha_v1.0.
+
+production:
+  name: "smoketest100"
+  version: "v0.1"
+  description: "Smoke test: 100 realizations (ph3000-ph3099) x 12 redshifts, lean output, to validate sbatch path + LFs at scale"
+  tags: ["smoke-test", "lean-output", "scale-test"]
+
+science:
+  cosmology: "AbacusSummit"
+  redshifts: [0.2, 0.25, 0.3, 0.4, 0.5, 0.8, 1.1, 1.4, 1.7, 2.0, 2.5, 3.0]
+  realizations:
+    start: 3000
+    count: 100
+    step: 1
+  catalog_params:
+    magnitude_limit: 25.0
+    area_deg2: 1000.0
+
+execution:
+  job_type: "gpu_intensive"
+  batch_size: 1
+  timeout_hours: 0.167
+  retry_policy:
+    max_retries: 3
+    backoff_multiplier: 2.0
+    initial_delay_minutes: 5.0
+
+# GPU resources (proven by the alpha_v1.0 run): 2 nodes x 4 tasks x 4 GPU = 8 GPU/box
+resources:
+  nodes_per_job: 2
+  tasks_per_node: 4
+  memory_gb: 128.0
+  gpus_per_node: 4
+  constraint: "gpu"
+
+outputs:
+  base_path: "/global/cfs/cdirs/m4943/Simulations/covariance_mocks"
+  structure: "hierarchical"
+  compression: "gzip"
+  cleanup_policy:
+    keep_logs_days: 365
+    keep_intermediate: true
+    archive_completed: false

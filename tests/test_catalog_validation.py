@@ -160,6 +160,7 @@ class TestCatalogValidation:
     
     
     @pytest.mark.system
+    @pytest.mark.slow
     @pytest.mark.skipif(not HDF5_AVAILABLE, reason="h5py not available")
     def test_reference_catalog_accessible(self, reference_catalog_path):
         """Test that reference catalog is accessible and valid."""
@@ -219,6 +220,7 @@ class TestCatalogContent:
     """Test catalog content properties."""
     
     @pytest.mark.system
+    @pytest.mark.slow
     @pytest.mark.skipif(not HDF5_AVAILABLE, reason="h5py not available")
     def test_reference_catalog_properties(self, reference_catalog_path):
         """Test basic properties of reference catalog."""
@@ -242,7 +244,8 @@ class TestCatalogContent:
                 assert np.all(np.isfinite(data)), f"Non-finite values found in {name}"
                 assert data.size > 0, f"Empty dataset: {name}"
     
-    @pytest.mark.system 
+    @pytest.mark.system
+    @pytest.mark.slow
     @pytest.mark.skipif(not HDF5_AVAILABLE, reason="h5py not available")
     def test_emission_line_properties_present(self, shared_catalog):
         """Test that emission line properties are present in generated catalog."""
