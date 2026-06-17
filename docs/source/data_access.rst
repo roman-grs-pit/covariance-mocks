@@ -17,6 +17,9 @@ redshift::
          manifest_z1.400.csv
          provenance_z1.400.json
 
+They can also be browsed on the NERSC portal at
+https://portal.nersc.gov/cfs/m4943/covariance_mocks.
+
 ``catalogs/z<redshift>/r<NNNN>.hdf5`` is realization ``NNNN`` at that redshift.
 ``z=1.4`` is a complete ensemble (1878 realizations). Redshifts 1.7, 2.5, 1.1, 2.0, and
 3.0 are also staged but are **partial ensembles** (fewer realizations), to be completed
