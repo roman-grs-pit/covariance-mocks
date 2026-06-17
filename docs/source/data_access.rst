@@ -18,8 +18,10 @@ redshift::
          provenance_z1.400.json
 
 ``catalogs/z<redshift>/r<NNNN>.hdf5`` is realization ``NNNN`` at that redshift.
-``z=1.4`` is available now (1878 realizations); other redshifts are added as they
-complete.
+``z=1.4`` is a complete ensemble (1878 realizations). Redshifts 1.7, 2.5, 1.1, 2.0, and
+3.0 are also staged but are **partial ensembles** (fewer realizations), to be completed
+in a later production run. Check ``metadata/manifest_z<redshift>.csv`` for the exact
+realizations present at each redshift.
 
 Catalog format
 --------------
