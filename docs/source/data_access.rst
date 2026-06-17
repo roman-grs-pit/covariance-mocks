@@ -66,7 +66,8 @@ Reading a catalog
 
    from covariance_mocks.selection import Catalog
 
-   with Catalog.open(".../v1/catalogs/z1.400/r3000.hdf5") as cat:
+   path = "/global/cfs/cdirs/m4943/covariance_mocks/v1/catalogs/z1.400/r3000.hdf5"
+   with Catalog.open(path) as cat:
        cat.redshift            # 1.4
        cat.Lbox                # 500.0
        cat.volume              # Lbox**3 in (Mpc/h)^3

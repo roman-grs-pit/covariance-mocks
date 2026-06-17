@@ -62,5 +62,5 @@ the manifest and provenance.
 Output locations
 ----------------
 
-* **Production output:** ``/global/cfs/cdirs/cosmosim/covariance_mocks/sfr_v1.0/``
-* **Staged copy:** ``/global/cfs/cdirs/m4943/covariance_mocks/v1/``
+* **Catalogs (home):** ``/global/cfs/cdirs/m4943/covariance_mocks/v1/``
+* **Production working area:** ``/global/cfs/cdirs/cosmosim/covariance_mocks/sfr_v1.0/``
