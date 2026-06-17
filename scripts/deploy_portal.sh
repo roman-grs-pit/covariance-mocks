@@ -16,26 +16,29 @@ HILITE_SRC="$REPO/local/dashboard/reports/_fig_highlight6_z1.400.png"
 
 [ -d "$WWW" ] || { echo "portal dir not found: $WWW"; exit 1; }
 
-# highlight image (9-panel SFR-only figure)
+# highlight image (9-panel SFR-only figure); clickable to open full-size
 if [ -f "$HILITE_SRC" ]; then
     cp -p "$HILITE_SRC" "$WWW/highlight.png"
     chmod a+r "$WWW/highlight.png"
-    HILITE_TAG='<img src="highlight.png" alt="SFR-only covariance mocks — highlight panels">'
+    HILITE_TAG='<a href="highlight.png" title="click to open full size"><img src="highlight.png" alt="SFR-only covariance mocks — highlight panels"></a>'
 else
     echo "WARN: highlight image not found ($HILITE_SRC); page will omit it"
     HILITE_TAG='<p><em>Highlight figure not available.</em></p>'
 fi
 
-# available redshifts (rows: redshift, #realizations) from the staged tree
+# available redshifts: each row links to the catalog dir + the manifest (browse/download)
 ROWS=""
 for d in "$WWW"/v1/catalogs/z*/; do
     [ -d "$d" ] || continue
     z=$(basename "$d" | sed 's/^z//')
     n=$(ls "$d" 2>/dev/null | wc -l)
-    ROWS="${ROWS}      <tr><td>${z}</td><td>${n}</td></tr>
+    man="v1/metadata/manifest_z${z}.csv"
+    mlink="&ndash;"
+    [ -f "$WWW/$man" ] && mlink="<a href=\"$man\">manifest</a>"
+    ROWS="${ROWS}      <tr><td><a href=\"v1/catalogs/z${z}/\">z = ${z}</a></td><td>${n}</td><td>${mlink}</td></tr>
 "
 done
-[ -n "$ROWS" ] || ROWS='      <tr><td colspan="2">(none staged yet)</td></tr>'
+[ -n "$ROWS" ] || ROWS='      <tr><td colspan="3">(none staged yet)</td></tr>'
 
 UPDATED=$(date -u '+%Y-%m-%d %H:%M UTC')
 
@@ -55,9 +58,10 @@ cat > "$WWW/index.html" <<HTML
   table { border-collapse: collapse; margin: 0.5rem 0; }
   th, td { border: 1px solid #ccc; padding: 0.3rem 0.8rem; text-align: left; }
   th { background: #f4f4f4; }
-  img { max-width: 100%; height: auto; border: 1px solid #ddd; margin-top: 0.5rem; }
+  img { max-width: 100%; height: auto; border: 1px solid #ddd; margin-top: 0.5rem; cursor: zoom-in; }
   a { color: #1a5fb4; }
   .muted { color: #666; font-size: 0.9rem; }
+  .download { background: #f0f6ff; border: 1px solid #cfe0ff; border-radius: 6px; padding: 0.6rem 1rem; }
 </style>
 </head>
 <body>
@@ -71,28 +75,31 @@ each realization is one HDF5 file.</p>
 
 <p><strong>Full documentation:</strong>
 <a href="$RTD">$RTD</a> &mdash; install, quickstart, the selection interface, and the
-catalog format. This page is the data portal; the docs site has the how-to.</p>
+catalog format.</p>
 
-<h2>Highlight</h2>
-$HILITE_TAG
+<h2>Download the catalogs</h2>
+<p class="download">Browse and download over HTTPS: <strong><a href="v1/catalogs/">v1/catalogs/</a></strong>
+(or the whole tree at <a href="v1/">v1/</a>). Click a redshift below to open its directory
+of <code>r&lt;NNNN&gt;.hdf5</code> realization files.</p>
 
-<h2>Data access</h2>
-<p>Browse the catalogs here on the portal:
-<a href="v1/">v1/</a>. On NERSC they are at
-<code>/global/cfs/cdirs/m4943/covariance_mocks/v1/</code>, laid out redshift-major:</p>
-<pre>v1/catalogs/z&lt;redshift&gt;/r&lt;NNNN&gt;.hdf5   # realization NNNN at that redshift
-v1/metadata/manifest_z&lt;redshift&gt;.csv   # realizations present, sizes, source</pre>
-
-<p>Available redshifts (realizations staged):</p>
 <table>
-  <thead><tr><th>redshift</th><th>realizations</th></tr></thead>
+  <thead><tr><th>redshift (browse)</th><th>realizations</th><th>file list</th></tr></thead>
   <tbody>
 $ROWS
   </tbody>
 </table>
-<p class="muted">z=1.4 is a complete ensemble; the other redshifts are partial ensembles,
-to be completed in a later run. See each <code>manifest_z&lt;redshift&gt;.csv</code> for the
-exact list.</p>
+<p class="muted">z = 1.4 is a complete ensemble; the other redshifts are partial ensembles,
+to be completed in a later run. Each <code>manifest_z&lt;redshift&gt;.csv</code> lists the
+realizations present, with sizes.</p>
+
+<p>On NERSC the same tree is at
+<code>/global/cfs/cdirs/m4943/covariance_mocks/v1/</code>, laid out redshift-major:</p>
+<pre>v1/catalogs/z&lt;redshift&gt;/r&lt;NNNN&gt;.hdf5   # realization NNNN at that redshift
+v1/metadata/manifest_z&lt;redshift&gt;.csv   # realizations present, sizes, source</pre>
+
+<h2>Highlight</h2>
+$HILITE_TAG
+<p class="muted">Click the figure to open it full size.</p>
 
 <h2>Catalog columns</h2>
 <table>
