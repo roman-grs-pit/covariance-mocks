@@ -3,10 +3,10 @@ import sys
 sys.path.insert(0, os.path.abspath('../../src'))
 
 # Project information
-project = 'Covariance Mocks Pipeline'
-copyright = '2025, Covariance Mocks Team'
-author = 'Covariance Mocks Team'
-release = '1.0'
+project = 'Roman GRS Covariance Mocks'
+copyright = '2026, Roman GRS-PIT'
+author = 'Roman GRS-PIT'
+release = 'v1'
 
 # Extensions
 extensions = [

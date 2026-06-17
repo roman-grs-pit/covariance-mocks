@@ -1,6 +1,9 @@
 API Reference
 =============
 
+API for the pipeline modules. The selection interface is documented in :doc:`selection`
+and :doc:`quickstart`.
+
 .. automodule:: covariance_mocks
    :members:
 

@@ -1,16 +1,23 @@
-Roman Galaxy Redshift Survey (GRS) Covariance Mocks Documentation
-==================================================================
+Roman GRS Covariance Mocks
+==========================
 
-A modular pipeline for generating mock galaxy catalogs for the **Roman Galaxy Redshift Survey (GRS)** using the rgrspit_diffsky package. This pipeline is part of the **Roman GRS Project Infrastructure Team (PIT)** analysis framework and runs on the **Perlmutter system at NERSC**.
+Mock galaxy catalogs and a Python interface for selecting samples from them.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: Using the mocks
+
+   overview
+   quickstart
+   selection
+   data_access
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Producing the mocks
 
    installation
-   quickstart
-   user_guide
-   campaign_management
+   producing_the_mocks
    api
    development
 

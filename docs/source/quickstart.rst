@@ -1,137 +1,82 @@
-Quick Start on Perlmutter (NERSC)
-=================================
+Quickstart
+==========
 
-Installation and Setup
------------------------
-
-First, clone the repository and set up the environment:
-
-.. code-block:: bash
-
-   # Clone the repository
-   git clone https://github.com/roman-grs-pit/covariance-mocks.git
-   cd covariance-mocks
-   
-   # Load environment on Perlmutter
-   source scripts/load_env.sh
-
-Basic Usage for Roman GRS PIT
-------------------------------
-
-Generate a single mock galaxy catalog for the Roman Galaxy Redshift Survey on Perlmutter:
-
-.. code-block:: bash
-
-   # Run single mock generation (Roman GRS PIT account)
-   python scripts/generate_single_mock.py nersc /path/to/output/directory
-
-For large-scale productions with thousands of jobs, use the production management system:
-
-.. code-block:: bash
-
-   # Install CLI tool (one-time setup)
-   pip install -e .
-   
-   # List available productions
-   production-manager list
-   
-   # Initialize production
-   production-manager init alpha
-   
-   # Submit production jobs to SLURM
-   production-manager submit alpha
-   
-   # Monitor production progress  
-   production-manager monitor alpha
-
-**Configuration Workflow:**
-
-1. **Copy template**: ``cp config/examples/covariance_template.yaml config/productions/my_production.yaml``
-2. **Edit config**: Modify production name, redshifts, and parameters
-3. **Run production**: ``production-manager init my_production``
-
-**Git Tagging for Reproducibility:**
-
-The system automatically creates git tags for every production:
-
-- **Clean working tree**: ``production-manager init alpha`` → ``production/alpha_v1.0_20250717_143022``
-- **Development mode**: ``production-manager init alpha --allow-dirty`` → ``production/alpha_v1.0_allow_dirty_20250717_143022``
-- **Version control**: ``production-manager init alpha --version v2.0`` → ``production/alpha_v2.0_20250717_143022``
-
-The single mock generation script will:
-
-1. Load AbacusSummit halo catalogs
-2. Apply filtering and slab decomposition for MPI
-3. Generate galaxies using rgrspit_diffsky
-4. Write results to HDF5 format
-
-The production management system will:
-
-1. Parse YAML configuration files from ``config/productions/``
-2. Create SQLite database for job tracking
-3. Submit SLURM array jobs with specified parameters
-4. Monitor job progress and handle failures
-5. Organize output files by production name
-
-Testing
+Install
 -------
 
-**Quick Development Testing** (< 5 minutes):
-
 .. code-block:: bash
 
-   # Load environment
-   source scripts/load_env.sh
-   
-   # Fast development tests only
-   pytest -m "unit or (system and not slow)" -v
+   git clone https://github.com/roman-grs-pit/covariance-mocks.git
+   cd covariance-mocks
+   git checkout sfr-only
+   pip install -e .
 
-**Long Validation Testing** (background execution):
+The catalogs are read from ``/global/cfs/cdirs/m4943``; nothing is copied.
 
-.. code-block:: bash
+Load a catalog
+--------------
 
-   # Load environment
-   source scripts/load_env.sh
-   
-   # Run validation tests in background
-   nohup pytest -m "slow or validation" -v --timeout=1800 > validation.log 2>&1 &
-   
-   # Monitor progress
-   tail -f validation.log
-
-
-Example Workflow
-----------------
-
-A typical workflow for generating mock catalogs:
+Open one HDF5 file with :class:`~covariance_mocks.selection.Catalog`. Columns are read
+lazily and returned exactly as stored.
 
 .. code-block:: python
 
-   from covariance_mocks import (
-       initialize_mpi_jax, finalize_mpi,
-       load_and_filter_halos, generate_galaxies,
-       write_parallel_hdf5, build_abacus_path
-   )
-   
-   # Initialize MPI/JAX
-   comm, rank, size, MPI_AVAILABLE = initialize_mpi_jax()
-   
-   # Build catalog path
-   catalog_path = build_abacus_path(
-       "/data", "AbacusSummit", "small_c000", "ph3000", "z1.100"
-   )
-   
-   # Load and filter halos (each rank gets its slab)
-   logmhost, halo_radius, halo_pos, halo_vel, Lbox = load_and_filter_halos(
-       catalog_path, rank, size
-   )
-   
-   # Generate galaxies for this rank's halos
-   galcat = generate_galaxies(logmhost, halo_radius, halo_pos, halo_vel, Lbox, rank)
-   
-   # Write output using parallel HDF5
-   write_parallel_hdf5(galcat, logmhost, halo_radius, halo_pos, halo_vel,
-                       "output.hdf5", rank, size, comm, Lbox)
-   
-   # Finalize MPI
-   finalize_mpi(comm, rank, size, MPI_AVAILABLE)
+   from covariance_mocks.selection import Catalog
+
+   path = "/global/cfs/cdirs/m4943/covariance_mocks/v1/catalogs/z1.400/r3000.hdf5"
+   with Catalog.open(path) as cat:
+       print(cat.redshift, cat.Lbox, len(cat))     # 1.4   500.0   34513407
+       sfr = cat.column("sfr_corr")
+
+Select a sample
+---------------
+
+Ask for a mean number density ``nbar`` [(h/Mpc)³] and get the ``sfr_corr`` threshold that
+yields it. For a single catalog, solve the threshold from that catalog:
+
+.. code-block:: python
+
+   from covariance_mocks.selection import Catalog, NumberDensity, select
+
+   with Catalog.open(path) as cat:
+       sel = NumberDensity(nbar=1e-3, per_realization=True)
+       sample = select(cat, sel)
+
+   print(sample.n)                          # ~124999 selected
+   print(sample.metadata["achieved_nbar"])  # 1.000e-03
+
+On the z=1.4 catalogs this cut is ``sfr_corr > ~43`` Msun/yr.
+
+Apply the same cut to every realization
+---------------------------------------
+
+Build the ensemble ``n(>sfr_corr)`` table once and reuse its threshold, so the same cut
+is applied to every realization:
+
+.. code-block:: python
+
+   import glob
+   from covariance_mocks.selection import build_ensemble_nsfr, NumberDensity, select_ensemble
+
+   paths = sorted(glob.glob(
+       "/global/cfs/cdirs/m4943/covariance_mocks/v1/catalogs/z1.400/r*.hdf5"))
+
+   ens = build_ensemble_nsfr(paths)
+   sel = NumberDensity(nbar=1e-3, ensemble=ens)
+
+   for sample in select_ensemble(paths, sel):
+       pos, vel = sample.positions, sample.velocities
+
+The returned sample
+-------------------
+
+:func:`~covariance_mocks.selection.select` returns a
+:class:`~covariance_mocks.selection.Sample` — the selected rows' columns plus metadata:
+
+.. code-block:: python
+
+   sample.n               # number of selected objects
+   sample["sfr_corr"]     # any column, selected rows only
+   sample.positions       # (N, 3) positions [Mpc/h]
+   sample.velocities      # (N, 3) velocities
+   sample.metadata        # selection, threshold, achieved_nbar, realization, redshift, Lbox
