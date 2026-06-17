@@ -83,13 +83,6 @@ The ensemble n(>SFR) table
 ensemble-averaged cumulative density ``n(>sfr_corr)``. Build it from a set of catalogs
 with :func:`~covariance_mocks.selection.build_ensemble_nsfr` (see :doc:`quickstart`).
 
-Completeness floor
-------------------
-
-The catalogs are complete for ``mstar_corr >= 10**9.5`` Msun.
-:class:`~covariance_mocks.selection.CompletenessFloor` enforces this; a selection below
-the floor is flagged by default or refused with ``mode="refuse"``.
-
 Metadata
 --------
 

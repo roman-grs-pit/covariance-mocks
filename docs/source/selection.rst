@@ -67,21 +67,3 @@ the mask must have length ``len(catalog)``.
    from covariance_mocks.selection import Callable
 
    sel = Callable(lambda c: (c["sfr_corr"] > 10.0) & (c["mstar_corr"] > 1e10))
-
-CompletenessFloor
------------------
-
-The catalogs are complete for ``mstar_corr >= 10**9.5`` Msun.
-:class:`~covariance_mocks.selection.CompletenessFloor` flags or refuses selections that
-dip below it.
-
-.. code-block:: python
-
-   from covariance_mocks.selection import CompletenessFloor, select
-
-   select(cat, sel, floor=CompletenessFloor(mode="flag"))     # allow + flag (default)
-   select(cat, sel, floor=CompletenessFloor(mode="refuse"))   # raise if below the floor
-
-Whether the selection reached below the floor is recorded in
-``sample.metadata["completeness"]["below_floor"]``. When ``select`` is called without a
-``floor``, the default floor in ``flag`` mode is applied.
