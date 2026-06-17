@@ -26,30 +26,6 @@ class Selection:
 
 
 @dataclass
-class CompletenessFloor:
-    """Documented completeness floor; selections below it are flagged or refused.
-
-    Default: the catalog is complete for ``mstar_corr >= 10**9.5`` (Msun). ``mode``
-    is ``"flag"`` (allow, set a flag in the sample metadata) or ``"refuse"`` (raise).
-    """
-    column: str = "mstar_corr"
-    value: float = 10 ** 9.5
-    mode: str = "flag"   # "flag" | "refuse"
-
-    def check(self, catalog: Catalog, mask: np.ndarray) -> bool:
-        """Return True if the selection dips below the floor. Raise if mode=refuse."""
-        if not mask.any():
-            return False
-        col = catalog.column(self.column)
-        below = bool(np.nanmin(col[mask]) < self.value)
-        if below and self.mode == "refuse":
-            raise ValueError(
-                f"selection reaches {self.column} < {self.value:g} (below the "
-                f"documented completeness floor); mode='refuse'")
-        return below
-
-
-@dataclass
 class NumberDensity(Selection):
     """Select the ``nbar`` [(h/Mpc)^3] highest-SFR objects.
 

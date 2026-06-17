@@ -3,10 +3,9 @@
 Defines what "validated" means for the layer:
   (i)   number-density inversion round-trips, and the ensemble-fixed threshold is
         identical across realizations;
-  (ii)  the completeness floor is enforced (flag and refuse);
-  (iii) column / units integrity -- the returned sample is the stored columns sliced
+  (ii)  column / units integrity -- the returned sample is the stored columns sliced
         by the mask, with no transformation (positions/velocities untouched);
-  (iv)  determinism -- same selection + same catalog -> same sample.
+  (iii) determinism -- same selection + same catalog -> same sample.
 
 Runs on a synthetic fixture (fast, CI). An optional test exercises a real z=1.4
 catalog if one is present on NERSC.
@@ -18,7 +17,7 @@ import numpy as np
 import pytest
 
 from covariance_mocks.selection import (
-    Catalog, NumberDensity, Threshold, Joint, Callable, CompletenessFloor,
+    Catalog, NumberDensity, Threshold, Joint, Callable,
     build_ensemble_nsfr, threshold_for_density, select, select_ensemble,
 )
 
@@ -30,7 +29,7 @@ def _write_catalog(path, n=200_000, seed=0):
     import h5py
     rng = np.random.default_rng(seed)
     sfr = 10 ** rng.normal(0.0, 0.6, n).astype(np.float32)          # ~Msun/yr
-    mstar = 10 ** rng.uniform(9.0, 11.0, n).astype(np.float32)       # spans the floor
+    mstar = 10 ** rng.uniform(9.0, 11.0, n).astype(np.float32)       # ~10^9 - 10^11 Msun
     pos = rng.uniform(0.0, LBOX, (n, 3)).astype(np.float64)
     vel = rng.normal(0.0, 300.0, (n, 3)).astype(np.float64)
     with h5py.File(path, "w") as f:
@@ -80,21 +79,7 @@ def test_per_realization_matches_nbar_exactly(ensemble_paths):
         assert s.metadata["achieved_nbar"] == pytest.approx(2e-3, abs=1.5 / cat.volume)
 
 
-# (ii) completeness floor --------------------------------------------------------
-def test_completeness_floor_flag_and_refuse(ensemble_paths):
-    with Catalog.open(ensemble_paths[0]) as cat:
-        low = Threshold("mstar_corr", lo=10 ** 9.0)               # dips below 10^9.5
-        flagged = select(cat, low, floor=CompletenessFloor(mode="flag"))
-        assert flagged.metadata["completeness"]["below_floor"] is True
-        with pytest.raises(ValueError):
-            select(cat, low, floor=CompletenessFloor(mode="refuse"))
-
-        high = Threshold("mstar_corr", lo=10 ** 10.0)             # safely above
-        ok = select(cat, high, floor=CompletenessFloor(mode="refuse"))
-        assert ok.metadata["completeness"]["below_floor"] is False
-
-
-# (iii) column / units integrity -------------------------------------------------
+# (ii) column / units integrity --------------------------------------------------
 def test_column_units_integrity(ensemble_paths):
     with Catalog.open(ensemble_paths[0]) as cat:
         sel = Threshold("sfr_corr", lo=1.0)

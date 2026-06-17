@@ -21,13 +21,13 @@ from .nsfr import (
     threshold_for_density, default_grid,
 )
 from .selection import (
-    Selection, NumberDensity, Threshold, Joint, Callable, CompletenessFloor,
+    Selection, NumberDensity, Threshold, Joint, Callable,
 )
 from .sample import Sample, select, select_ensemble, DEFAULT_COLUMNS
 
 __all__ = [
     "Catalog", "EnsembleNSFR", "build_ensemble_nsfr", "cumulative_n_gt",
     "threshold_for_density", "default_grid", "Selection", "NumberDensity",
-    "Threshold", "Joint", "Callable", "CompletenessFloor", "Sample", "select",
+    "Threshold", "Joint", "Callable", "Sample", "select",
     "select_ensemble", "DEFAULT_COLUMNS",
 ]

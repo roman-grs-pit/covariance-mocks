@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .catalog import Catalog
-from .selection import Selection, CompletenessFloor
+from .selection import Selection
 
 # Default columns returned with each sample (the documented data model).
 DEFAULT_COLUMNS = (
@@ -48,16 +48,12 @@ class Sample:
 
 
 def select(catalog: Catalog, selection: Selection,
-           floor: CompletenessFloor | None = None,
            columns=DEFAULT_COLUMNS) -> Sample:
     """Apply ``selection`` to ``catalog`` and return the :class:`Sample`.
 
-    Columns are sliced from the stored arrays with no transformation. If a
-    completeness ``floor`` is given it is enforced (flag or refuse).
+    Columns are sliced from the stored arrays with no transformation.
     """
-    floor = CompletenessFloor() if floor is None else floor
     mask = selection.mask(catalog)
-    below_floor = floor.check(catalog, mask)   # raises if mode='refuse'
 
     cols = {name: catalog.column(name)[mask] for name in columns}
 
@@ -71,10 +67,6 @@ def select(catalog: Catalog, selection: Selection,
         "n_selected": int(mask.sum()),
         "n_total": len(catalog),
         "achieved_nbar": achieved_nbar,
-        "completeness": {
-            "column": floor.column, "floor": floor.value,
-            "below_floor": below_floor, "mode": floor.mode,
-        },
         "source_path": catalog.path,
     }
     # surface the fixed threshold for number-density selections (audit trail)
@@ -85,7 +77,6 @@ def select(catalog: Catalog, selection: Selection,
 
 
 def select_ensemble(paths, selection: Selection,
-                    floor: CompletenessFloor | None = None,
                     columns=DEFAULT_COLUMNS):
     """Yield one :class:`Sample` per realization, applying the SAME selection to each.
 
@@ -96,4 +87,4 @@ def select_ensemble(paths, selection: Selection,
     """
     for p in paths:
         with Catalog.open(p) as cat:
-            yield select(cat, selection, floor=floor, columns=columns)
+            yield select(cat, selection, columns=columns)
